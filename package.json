@@ -10,10 +10,17 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "ops": "bash scripts/ops.sh",
+    "ops:health": "bash scripts/ops.sh health",
+    "ops:login": "bash scripts/ops.sh login",
+    "ops:refresh": "bash scripts/ops.sh refresh",
+    "ops:set-operator": "bash scripts/ops.sh set-operator",
+    "operator:set": "node scripts/set-operator.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "joi": "^17.13.3",
