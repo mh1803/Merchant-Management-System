@@ -3,30 +3,30 @@ const { AppError } = require('../errors');
 const { config } = require('../config');
 const {
   getOperatorByEmail,
-  updateOperator,
+  setOperatorLoginState,
   saveRefreshSession,
   getRefreshSession,
   deleteRefreshSession
-} = require('../db/inMemoryStore');
+} = require('../db/authRepository');
 const { issueAccessToken, issueRefreshToken, verifyRefreshToken } = require('./tokenService');
 
-function buildAuthResponse(operator) {
+async function buildAuthResponse(operator) {
   const accessToken = issueAccessToken({
     operatorId: operator.id,
     email: operator.email,
     role: operator.role
   });
 
-  const { token: refreshToken, jti } = issueRefreshToken({
+  const { token: refreshToken, jti, expiresAt } = issueRefreshToken({
     operatorId: operator.id,
     email: operator.email,
     role: operator.role
   });
 
-  saveRefreshSession({
+  await saveRefreshSession({
     jti,
     operatorId: operator.id,
-    expiresAt: Date.now() + 1000
+    expiresAt
   });
 
   return {
@@ -46,7 +46,7 @@ function lockoutRetrySeconds(operator) {
 }
 
 async function login({ email, password }) {
-  const operator = getOperatorByEmail(email);
+  const operator = await getOperatorByEmail(email);
 
   if (!operator) {
     throw new AppError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
@@ -66,7 +66,7 @@ async function login({ email, password }) {
       lockoutUntil = Date.now() + config.loginLockoutMinutes * 60 * 1000;
     }
 
-    const updated = updateOperator(operator.id, {
+    const updated = await setOperatorLoginState(operator.id, {
       failedLoginAttempts,
       lockoutUntil
     });
@@ -78,7 +78,7 @@ async function login({ email, password }) {
     throw new AppError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   }
 
-  updateOperator(operator.id, {
+  await setOperatorLoginState(operator.id, {
     failedLoginAttempts: 0,
     lockoutUntil: null
   });
@@ -99,14 +99,18 @@ async function refresh({ refreshToken }) {
     throw new AppError(401, 'Invalid refresh token', 'INVALID_REFRESH_TOKEN');
   }
 
-  const session = getRefreshSession(payload.jti);
+  const session = await getRefreshSession(payload.jti);
   if (!session || session.operatorId !== payload.sub) {
     throw new AppError(401, 'Refresh token is no longer valid', 'INVALID_REFRESH_TOKEN');
   }
+  if (session.expiresAt < Date.now()) {
+    await deleteRefreshSession(payload.jti);
+    throw new AppError(401, 'Refresh token is no longer valid', 'INVALID_REFRESH_TOKEN');
+  }
 
-  deleteRefreshSession(payload.jti);
+  await deleteRefreshSession(payload.jti);
 
-  const operator = getOperatorByEmail(payload.email);
+  const operator = await getOperatorByEmail(payload.email);
   if (!operator) {
     throw new AppError(401, 'Invalid refresh token', 'INVALID_REFRESH_TOKEN');
   }

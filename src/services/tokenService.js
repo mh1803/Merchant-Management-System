@@ -18,7 +18,8 @@ function issueRefreshToken({ operatorId, email, role }) {
     { expiresIn: config.refreshTtl }
   );
 
-  return { token, jti };
+  const decoded = jwt.decode(token);
+  return { token, jti, expiresAt: decoded && decoded.exp ? decoded.exp * 1000 : Date.now() };
 }
 
 function verifyRefreshToken(refreshToken) {
