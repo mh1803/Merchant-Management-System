@@ -160,6 +160,9 @@ Commands:
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
 
+  merchant:history <merchantId>
+      View immutable merchant status history. You must be logged in.
+
   kyb:add-doc <merchantId> <type> <fileName>
       Record or replace a merchant KYB document. You must be logged in.
 
@@ -188,6 +191,7 @@ Examples:
   npm run ops -- merchant:list Active Casablanca
   npm run ops -- merchant:get <merchantId>
   npm run ops -- merchant:update <merchantId> - - Rabat - Active
+  npm run ops -- merchant:history <merchantId>
   npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
   npm run ops -- kyb:list-docs <merchantId>
   npm run ops -- kyb:get-doc <merchantId> business_registration
@@ -363,6 +367,20 @@ case "$cmd" in
     fi
 
     mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:history)
+    merchant_id="${2:-}"
+
+    if [[ -z "$merchant_id" ]]; then
+      echo "Usage: npm run ops -- merchant:history <merchantId>" >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/history")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
     print_response "$status" "$body"

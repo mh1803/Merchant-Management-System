@@ -23,6 +23,7 @@
     "ops:merchant:list": "bash scripts/ops.sh merchant:list",
     "ops:merchant:get": "bash scripts/ops.sh merchant:get",
     "ops:merchant:update": "bash scripts/ops.sh merchant:update",
+    "ops:merchant:history": "bash scripts/ops.sh merchant:history",
     "ops:kyb:add-doc": "bash scripts/ops.sh kyb:add-doc",
     "ops:kyb:list-docs": "bash scripts/ops.sh kyb:list-docs",
     "ops:kyb:get-doc": "bash scripts/ops.sh kyb:get-doc",
