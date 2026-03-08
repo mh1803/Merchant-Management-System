@@ -2,6 +2,8 @@
 
 Backend CRM engine for merchant onboarding and KYB lifecycle management.
 
+The codebase is implemented in TypeScript.
+
 ## Initial Setup
 
 1. Install dependencies:
@@ -25,9 +27,12 @@ npm run dev
 ```
 
 For test/simulated mode without PostgreSQL, set `AUTH_STORAGE=memory`.
+For a one-command local start that runs migrations first, use `npm run start:dev`.
 
 ## Scripts
 - `npm run dev` - run server with watch mode
+- `npm run start:dev` - run migrations, then start the dev server
+- `npm run build` - compile TypeScript to `dist/`
 - `npm start` - run server
 - `npm run db:migrate` - apply SQL migrations
 - `npm test` - run tests

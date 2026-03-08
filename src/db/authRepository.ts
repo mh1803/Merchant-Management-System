@@ -1,21 +1,49 @@
-const crypto = require('crypto');
-const { pool } = require('./index');
+import crypto from 'crypto';
+import { pool } from './index';
+import { OperatorRecord, OperatorRole, RefreshSessionRecord } from '../types/auth';
+
+interface OperatorRow {
+  id: string;
+  email: string;
+  password_hash: string;
+  role: OperatorRole;
+  failed_login_attempts: number;
+  lockout_until: string | null;
+}
+
+interface RefreshSessionRow {
+  jti: string;
+  operator_id: string;
+  expires_at: string;
+}
+
+interface CreateOrUpdateOperatorInput {
+  email: string;
+  passwordHash: string;
+  role?: OperatorRole;
+  id?: string;
+}
+
+interface LoginStatePatch {
+  failedLoginAttempts: number;
+  lockoutUntil: number | null;
+}
 
 const memoryState = {
-  operatorsById: new Map(),
-  operatorIdByEmail: new Map(),
-  refreshSessionsByJti: new Map()
+  operatorsById: new Map<string, OperatorRecord>(),
+  operatorIdByEmail: new Map<string, string>(),
+  refreshSessionsByJti: new Map<string, RefreshSessionRecord>()
 };
 
-function storageMode() {
+function storageMode(): string {
   return process.env.AUTH_STORAGE || 'postgres';
 }
 
-function normalizeEmail(email) {
+function normalizeEmail(email: string): string {
   return String(email || '').trim().toLowerCase();
 }
 
-function mapOperatorFromDb(row) {
+function mapOperatorFromDb(row?: OperatorRow): OperatorRecord | null {
   if (!row) {
     return null;
   }
@@ -30,7 +58,7 @@ function mapOperatorFromDb(row) {
   };
 }
 
-async function getOperatorByEmail(email) {
+export async function getOperatorByEmail(email: string): Promise<OperatorRecord | null> {
   const normalizedEmail = normalizeEmail(email);
 
   if (storageMode() === 'memory') {
@@ -43,7 +71,7 @@ async function getOperatorByEmail(email) {
     return operator ? { ...operator } : null;
   }
 
-  const { rows } = await pool.query(
+  const { rows } = await pool.query<OperatorRow>(
     `SELECT id, email, password_hash, role, failed_login_attempts, lockout_until
      FROM operators
      WHERE LOWER(email) = LOWER($1)
@@ -54,15 +82,19 @@ async function getOperatorByEmail(email) {
   return mapOperatorFromDb(rows[0]);
 }
 
-async function createOrUpdateOperator({ email, passwordHash, role = 'operator', id = crypto.randomUUID() }) {
+export async function createOrUpdateOperator({
+  email,
+  passwordHash,
+  role = 'operator',
+  id = crypto.randomUUID()
+}: CreateOrUpdateOperatorInput): Promise<OperatorRecord> {
   const normalizedEmail = normalizeEmail(email);
 
   if (storageMode() === 'memory') {
     const existingId = memoryState.operatorIdByEmail.get(normalizedEmail);
     const operatorId = existingId || id;
-
     const current = existingId ? memoryState.operatorsById.get(existingId) : null;
-    const next = {
+    const next: OperatorRecord = {
       id: operatorId,
       email: normalizedEmail,
       passwordHash,
@@ -76,7 +108,7 @@ async function createOrUpdateOperator({ email, passwordHash, role = 'operator', 
     return { ...next };
   }
 
-  const { rows } = await pool.query(
+  const { rows } = await pool.query<OperatorRow>(
     `INSERT INTO operators (id, email, password_hash, role)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (email)
@@ -88,17 +120,25 @@ async function createOrUpdateOperator({ email, passwordHash, role = 'operator', 
     [id, normalizedEmail, passwordHash, role]
   );
 
-  return mapOperatorFromDb(rows[0]);
+  const operator = mapOperatorFromDb(rows[0]);
+  if (!operator) {
+    throw new Error('Failed to save operator');
+  }
+
+  return operator;
 }
 
-async function setOperatorLoginState(operatorId, { failedLoginAttempts, lockoutUntil }) {
+export async function setOperatorLoginState(
+  operatorId: string,
+  { failedLoginAttempts, lockoutUntil }: LoginStatePatch
+): Promise<OperatorRecord | null> {
   if (storageMode() === 'memory') {
     const current = memoryState.operatorsById.get(operatorId);
     if (!current) {
       return null;
     }
 
-    const next = {
+    const next: OperatorRecord = {
       ...current,
       failedLoginAttempts,
       lockoutUntil
@@ -110,7 +150,7 @@ async function setOperatorLoginState(operatorId, { failedLoginAttempts, lockoutU
 
   const lockoutTimestamp = lockoutUntil ? new Date(lockoutUntil).toISOString() : null;
 
-  const { rows } = await pool.query(
+  const { rows } = await pool.query<OperatorRow>(
     `UPDATE operators
      SET failed_login_attempts = $2,
          lockout_until = $3,
@@ -123,7 +163,11 @@ async function setOperatorLoginState(operatorId, { failedLoginAttempts, lockoutU
   return mapOperatorFromDb(rows[0]);
 }
 
-async function saveRefreshSession({ jti, operatorId, expiresAt }) {
+export async function saveRefreshSession({
+  jti,
+  operatorId,
+  expiresAt
+}: RefreshSessionRecord): Promise<void> {
   if (storageMode() === 'memory') {
     memoryState.refreshSessionsByJti.set(jti, {
       jti,
@@ -141,13 +185,13 @@ async function saveRefreshSession({ jti, operatorId, expiresAt }) {
   );
 }
 
-async function getRefreshSession(jti) {
+export async function getRefreshSession(jti: string): Promise<RefreshSessionRecord | null> {
   if (storageMode() === 'memory') {
     const session = memoryState.refreshSessionsByJti.get(jti);
     return session ? { ...session } : null;
   }
 
-  const { rows } = await pool.query(
+  const { rows } = await pool.query<RefreshSessionRow>(
     `SELECT jti, operator_id, expires_at
      FROM refresh_sessions
      WHERE jti = $1
@@ -166,7 +210,7 @@ async function getRefreshSession(jti) {
   };
 }
 
-async function deleteRefreshSession(jti) {
+export async function deleteRefreshSession(jti: string): Promise<void> {
   if (storageMode() === 'memory') {
     memoryState.refreshSessionsByJti.delete(jti);
     return;
@@ -175,18 +219,8 @@ async function deleteRefreshSession(jti) {
   await pool.query('DELETE FROM refresh_sessions WHERE jti = $1', [jti]);
 }
 
-function resetAuthStoreForTests() {
+export function resetAuthStoreForTests(): void {
   memoryState.operatorsById.clear();
   memoryState.operatorIdByEmail.clear();
   memoryState.refreshSessionsByJti.clear();
 }
-
-module.exports = {
-  getOperatorByEmail,
-  createOrUpdateOperator,
-  setOperatorLoginState,
-  saveRefreshSession,
-  getRefreshSession,
-  deleteRefreshSession,
-  resetAuthStoreForTests
-};

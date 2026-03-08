@@ -1,16 +1,17 @@
-const bcrypt = require('bcryptjs');
-const { AppError } = require('../errors');
-const { config } = require('../config');
-const {
+import bcrypt from 'bcryptjs';
+import { AppError } from '../errors';
+import { config } from '../config';
+import {
+  deleteRefreshSession,
   getOperatorByEmail,
-  setOperatorLoginState,
-  saveRefreshSession,
   getRefreshSession,
-  deleteRefreshSession
-} = require('../db/authRepository');
-const { issueAccessToken, issueRefreshToken, verifyRefreshToken } = require('./tokenService');
+  saveRefreshSession,
+  setOperatorLoginState
+} from '../db/authRepository';
+import { issueAccessToken, issueRefreshToken, verifyRefreshToken } from './tokenService';
+import { AuthTokens, LoginInput, OperatorRecord, RefreshInput } from '../types/auth';
 
-async function buildAuthResponse(operator) {
+async function buildAuthResponse(operator: OperatorRecord): Promise<AuthTokens> {
   const accessToken = issueAccessToken({
     operatorId: operator.id,
     email: operator.email,
@@ -37,15 +38,15 @@ async function buildAuthResponse(operator) {
   };
 }
 
-function isLocked(operator) {
+function isLocked(operator: OperatorRecord): boolean {
   return Boolean(operator.lockoutUntil && Date.now() < operator.lockoutUntil);
 }
 
-function lockoutRetrySeconds(operator) {
-  return Math.ceil((operator.lockoutUntil - Date.now()) / 1000);
+export function lockoutRetrySeconds(operator: OperatorRecord): number {
+  return Math.ceil(((operator.lockoutUntil || 0) - Date.now()) / 1000);
 }
 
-async function login({ email, password }) {
+export async function login({ email, password }: LoginInput): Promise<AuthTokens> {
   const operator = await getOperatorByEmail(email);
 
   if (!operator) {
@@ -60,7 +61,7 @@ async function login({ email, password }) {
 
   if (!passwordMatches) {
     const failedLoginAttempts = operator.failedLoginAttempts + 1;
-    let lockoutUntil = null;
+    let lockoutUntil: number | null = null;
 
     if (failedLoginAttempts >= config.loginMaxAttempts) {
       lockoutUntil = Date.now() + config.loginLockoutMinutes * 60 * 1000;
@@ -86,12 +87,12 @@ async function login({ email, password }) {
   return buildAuthResponse(operator);
 }
 
-async function refresh({ refreshToken }) {
+export async function refresh({ refreshToken }: RefreshInput): Promise<AuthTokens> {
   let payload;
 
   try {
     payload = verifyRefreshToken(refreshToken);
-  } catch (error) {
+  } catch {
     throw new AppError(401, 'Invalid refresh token', 'INVALID_REFRESH_TOKEN');
   }
 
@@ -103,6 +104,7 @@ async function refresh({ refreshToken }) {
   if (!session || session.operatorId !== payload.sub) {
     throw new AppError(401, 'Refresh token is no longer valid', 'INVALID_REFRESH_TOKEN');
   }
+
   if (session.expiresAt < Date.now()) {
     await deleteRefreshSession(payload.jti);
     throw new AppError(401, 'Refresh token is no longer valid', 'INVALID_REFRESH_TOKEN');
@@ -117,9 +119,3 @@ async function refresh({ refreshToken }) {
 
   return buildAuthResponse(operator);
 }
-
-module.exports = {
-  login,
-  refresh,
-  lockoutRetrySeconds
-};

@@ -6,9 +6,9 @@ process.env.JWT_REFRESH_TTL = '7d';
 process.env.LOGIN_MAX_ATTEMPTS = '3';
 process.env.LOGIN_LOCKOUT_MINUTES = '15';
 
-const bcrypt = require('bcryptjs');
-const { createOrUpdateOperator, resetAuthStoreForTests } = require('../src/db/authRepository');
-const { login, refresh } = require('../src/services/authService');
+import bcrypt from 'bcryptjs';
+import { createOrUpdateOperator, resetAuthStoreForTests } from '../src/db/authRepository';
+import { login, refresh } from '../src/services/authService';
 
 describe('Auth service', () => {
   beforeEach(async () => {

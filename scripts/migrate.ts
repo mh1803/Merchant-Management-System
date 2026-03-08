@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-require('dotenv').config();
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { pool } from '../src/db';
 
-const fs = require('fs');
-const path = require('path');
-const { pool } = require('../src/db');
-
-async function run() {
+async function run(): Promise<void> {
   const migrationsDir = path.resolve(process.cwd(), 'migrations');
   const files = fs
     .readdirSync(migrationsDir)
@@ -21,8 +20,8 @@ async function run() {
 }
 
 run()
-  .catch((error) => {
-    console.error(error.message || error);
+  .catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   })
   .finally(async () => {
