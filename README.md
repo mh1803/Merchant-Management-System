@@ -97,6 +97,30 @@ npm run ops -- merchant:update <merchantId> - - Rabat - Active
 Use `-` to skip fields you do not want to change.
 You must be logged in first.
 
+- Record a KYB document:
+```bash
+npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
+```
+You must be logged in first.
+
+- List KYB documents:
+```bash
+npm run ops -- kyb:list-docs <merchantId>
+```
+You must be logged in first.
+
+- Get one KYB document:
+```bash
+npm run ops -- kyb:get-doc <merchantId> business_registration
+```
+You must be logged in first.
+
+- Verify a KYB document:
+```bash
+npm run ops -- kyb:verify-doc <merchantId> business_registration true
+```
+You must be logged in first.
+
 - Optional: change API base URL when needed:
 ```bash
 API_URL=http://localhost:3000 npm run ops -- health

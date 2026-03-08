@@ -160,6 +160,18 @@ Commands:
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
 
+  kyb:add-doc <merchantId> <type> <fileName>
+      Record or replace a merchant KYB document. You must be logged in.
+
+  kyb:list-docs <merchantId>
+      List merchant KYB documents. You must be logged in.
+
+  kyb:get-doc <merchantId> <type>
+      Get one merchant KYB document by type. You must be logged in.
+
+  kyb:verify-doc <merchantId> <type> <true|false>
+      Mark a merchant KYB document verified or unverified. You must be logged in.
+
   set-operator <email> <password> [role]
       Create or update an operator in auth storage.
       Requirements: valid email, password >= 8 chars, role in [admin, operator].
@@ -176,6 +188,10 @@ Examples:
   npm run ops -- merchant:list Active Casablanca
   npm run ops -- merchant:get <merchantId>
   npm run ops -- merchant:update <merchantId> - - Rabat - Active
+  npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
+  npm run ops -- kyb:list-docs <merchantId>
+  npm run ops -- kyb:get-doc <merchantId> business_registration
+  npm run ops -- kyb:verify-doc <merchantId> business_registration true
 USAGE
 }
 
@@ -347,6 +363,77 @@ case "$cmd" in
     fi
 
     mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  kyb:add-doc)
+    merchant_id="${2:-}"
+    document_type="${3:-}"
+    file_name="${4:-}"
+
+    if [[ -z "$merchant_id" || -z "$document_type" || -z "$file_name" ]]; then
+      echo "Usage: npm run ops -- kyb:add-doc <merchantId> <type> <fileName>" >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [type, fileName] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ type, fileName }));
+    ' "$document_type" "$file_name")"
+
+    mapfile -t response < <(request_with_saved_access_token "POST" "merchants/$merchant_id/documents" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  kyb:list-docs)
+    merchant_id="${2:-}"
+
+    if [[ -z "$merchant_id" ]]; then
+      echo "Usage: npm run ops -- kyb:list-docs <merchantId>" >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/documents")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  kyb:get-doc)
+    merchant_id="${2:-}"
+    document_type="${3:-}"
+
+    if [[ -z "$merchant_id" || -z "$document_type" ]]; then
+      echo "Usage: npm run ops -- kyb:get-doc <merchantId> <type>" >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/documents/$document_type")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  kyb:verify-doc)
+    merchant_id="${2:-}"
+    document_type="${3:-}"
+    verified_value="${4:-}"
+
+    if [[ -z "$merchant_id" || -z "$document_type" || -z "$verified_value" ]]; then
+      echo "Usage: npm run ops -- kyb:verify-doc <merchantId> <type> <true|false>" >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [verified] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ verified: verified === "true" }));
+    ' "$verified_value")"
+
+    mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id/documents/$document_type/verify" "$payload")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
     print_response "$status" "$body"
