@@ -1,3 +1,4 @@
+process.env.AUTH_STORAGE = 'memory';
 process.env.JWT_ACCESS_SECRET = 'test-access-secret';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 process.env.JWT_ACCESS_TTL = '15m';
@@ -5,15 +6,17 @@ process.env.JWT_REFRESH_TTL = '7d';
 process.env.LOGIN_MAX_ATTEMPTS = '3';
 process.env.LOGIN_LOCKOUT_MINUTES = '15';
 
-const { createOperator, resetAuthStore } = require('../src/db/inMemoryStore');
+const bcrypt = require('bcryptjs');
+const { createOrUpdateOperator, resetAuthStoreForTests } = require('../src/db/authRepository');
 const { login, refresh } = require('../src/services/authService');
 
 describe('Auth service', () => {
   beforeEach(async () => {
-    resetAuthStore();
-    await createOperator({
+    resetAuthStoreForTests();
+
+    await createOrUpdateOperator({
       email: 'admin@example.com',
-      password: 'StrongPass123',
+      passwordHash: await bcrypt.hash('StrongPass123', 10),
       role: 'admin'
     });
   });
