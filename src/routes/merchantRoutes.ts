@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/authenticate';
 import {
   createMerchantController,
   getMerchantController,
+  listMerchantHistoryController,
   listMerchantsController,
   updateMerchantController
 } from '../controllers/merchantController';
@@ -20,6 +21,7 @@ merchantRouter.post('/', createMerchantController);
 merchantRouter.get('/', listMerchantsController);
 merchantRouter.get('/:merchantId', getMerchantController);
 merchantRouter.patch('/:merchantId', updateMerchantController);
+merchantRouter.get('/:merchantId/history', listMerchantHistoryController);
 merchantRouter.post('/:merchantId/documents', recordMerchantDocumentController);
 merchantRouter.get('/:merchantId/documents', listMerchantDocumentsController);
 merchantRouter.get('/:merchantId/documents/:documentType', getMerchantDocumentController);

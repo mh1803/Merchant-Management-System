@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { NextFunction, Request, Response } from 'express';
+import { listMerchantHistoryController } from './historyController';
 import {
   addMerchant,
   editMerchant,
@@ -98,9 +99,15 @@ export async function updateMerchantController(
     const merchantId = Array.isArray(req.params.merchantId)
       ? req.params.merchantId[0]
       : req.params.merchantId;
-    const merchant = await editMerchant(merchantId, value);
+    const actor = res.locals.operator as { id: string; email: string };
+    const merchant = await editMerchant(merchantId, value, {
+      operatorId: actor.id,
+      email: actor.email
+    });
     res.status(200).json(merchant);
   } catch (error) {
     next(error);
   }
 }
+
+export { listMerchantHistoryController };

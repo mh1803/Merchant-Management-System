@@ -97,6 +97,12 @@ npm run ops -- merchant:update <merchantId> - - Rabat - Active
 Use `-` to skip fields you do not want to change.
 You must be logged in first.
 
+- View merchant status history:
+```bash
+npm run ops -- merchant:history <merchantId>
+```
+You must be logged in first.
+
 - Record a KYB document:
 ```bash
 npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
@@ -145,6 +151,9 @@ API_URL=http://localhost:3000 npm run ops -- health
 - `PATCH /merchants/:merchantId`
   - requires bearer token
   - body: any subset of merchant fields to update
+- `GET /merchants/:merchantId/history`
+  - requires bearer token
+  - returns immutable merchant status change history
 
 ## Operator Setup
 Use the CLI to create or update operators in the configured auth backend (`AUTH_STORAGE`, default `postgres`):
