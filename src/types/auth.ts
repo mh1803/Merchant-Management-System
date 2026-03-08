@@ -46,3 +46,12 @@ export interface RefreshTokenPayload {
   iat?: number;
   exp?: number;
 }
+
+export interface AccessTokenPayload {
+  sub: string;
+  email: string;
+  role: OperatorRole;
+  tokenType: 'access';
+  iat?: number;
+  exp?: number;
+}

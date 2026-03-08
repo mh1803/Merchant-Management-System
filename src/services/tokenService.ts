@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { RefreshTokenPayload, TokenSubject } from '../types/auth';
+import { AccessTokenPayload, RefreshTokenPayload, TokenSubject } from '../types/auth';
 
 interface IssuedRefreshToken {
   token: string;
@@ -36,4 +36,8 @@ export function issueRefreshToken({ operatorId, email, role }: TokenSubject): Is
 
 export function verifyRefreshToken(refreshToken: string): RefreshTokenPayload {
   return jwt.verify(refreshToken, config.refreshSecret) as RefreshTokenPayload;
+}
+
+export function verifyAccessToken(accessToken: string): AccessTokenPayload {
+  return jwt.verify(accessToken, config.accessSecret) as AccessTokenPayload;
 }
