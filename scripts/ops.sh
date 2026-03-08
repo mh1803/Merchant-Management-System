@@ -73,6 +73,55 @@ post_json() {
   rm -f "$body"
 }
 
+request_json() {
+  local method="$1"
+  local endpoint="$2"
+  local payload="${3:-}"
+  local auth_header="${4:-}"
+  local body
+  local status
+
+  body="$(mktemp)"
+
+  if [[ -n "$payload" ]]; then
+    status="$(curl -sS -o "$body" -w "%{http_code}" -X "$method" "$API_URL/$endpoint" \
+      -H "Content-Type: application/json" \
+      ${auth_header:+-H "$auth_header"} \
+      -d "$payload")"
+  else
+    status="$(curl -sS -o "$body" -w "%{http_code}" -X "$method" "$API_URL/$endpoint" \
+      ${auth_header:+-H "$auth_header"})"
+  fi
+
+  printf '%s\n' "$status"
+  cat "$body"
+  rm -f "$body"
+}
+
+request_with_saved_access_token() {
+  local method="$1"
+  local endpoint="$2"
+  local payload="${3:-}"
+  local access_token
+
+  access_token="$(read_saved_token "accessToken")"
+  request_json "$method" "$endpoint" "$payload" "Authorization: Bearer $access_token"
+}
+
+print_response() {
+  local status="$1"
+  local body="$2"
+
+  if [[ "$status" =~ ^2 ]]; then
+    echo "HTTP $status"
+    print_json "$body"
+  else
+    echo "HTTP $status" >&2
+    print_json "$body" >&2
+    exit 1
+  fi
+}
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -98,6 +147,19 @@ Commands:
   auth-header
       Print the Authorization header using the saved access token.
 
+  merchant:create <name> <category> <city> <contactEmail> [status]
+      Create a merchant. You must be logged in.
+
+  merchant:list [status] [city] [category] [q]
+      List merchants with optional filters. You must be logged in.
+
+  merchant:get <merchantId>
+      Get a single merchant by id. You must be logged in.
+
+  merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]
+      Update merchant fields. You must be logged in.
+      Pass - to skip a field you do not want to change.
+
   set-operator <email> <password> [role]
       Create or update an operator in auth storage.
       Requirements: valid email, password >= 8 chars, role in [admin, operator].
@@ -110,6 +172,10 @@ Examples:
   npm run ops -- refresh
   npm run ops -- token access
   npm run ops -- auth-header
+  npm run ops -- merchant:create "Atlas Pharmacy" Pharmacy Casablanca owner@atlas.ma
+  npm run ops -- merchant:list Active Casablanca
+  npm run ops -- merchant:get <merchantId>
+  npm run ops -- merchant:update <merchantId> - - Rabat - Active
 USAGE
 }
 
@@ -139,13 +205,10 @@ case "$cmd" in
 
     if [[ "$status" == "200" ]]; then
       save_tokens "$body"
-      echo "HTTP $status"
-      print_json "$body"
+      print_response "$status" "$body"
       echo "Saved tokens to $TOKEN_FILE"
     else
-      echo "HTTP $status" >&2
-      print_json "$body" >&2
-      exit 1
+      print_response "$status" "$body"
     fi
     ;;
 
@@ -162,13 +225,10 @@ case "$cmd" in
 
     if [[ "$status" == "200" ]]; then
       save_tokens "$body"
-      echo "HTTP $status"
-      print_json "$body"
+      print_response "$status" "$body"
       echo "Replaced saved tokens in $TOKEN_FILE"
     else
-      echo "HTTP $status" >&2
-      print_json "$body" >&2
-      exit 1
+      print_response "$status" "$body"
     fi
     ;;
 
@@ -192,6 +252,104 @@ case "$cmd" in
   auth-header)
     access_token="$(read_saved_token "accessToken")"
     printf 'Authorization: Bearer %s\n' "$access_token"
+    ;;
+
+  merchant:create)
+    name="${2:-}"
+    category="${3:-}"
+    city="${4:-}"
+    contact_email="${5:-}"
+    status_value="${6:-Pending KYB}"
+
+    if [[ -z "$name" || -z "$category" || -z "$city" || -z "$contact_email" ]]; then
+      echo "Usage: npm run ops -- merchant:create <name> <category> <city> <contactEmail> [status]" >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [name, category, city, contactEmail, status] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ name, category, city, contactEmail, status }));
+    ' "$name" "$category" "$city" "$contact_email" "$status_value")"
+
+    mapfile -t response < <(request_with_saved_access_token "POST" "merchants" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:list)
+    status_filter="${2:-}"
+    city_filter="${3:-}"
+    category_filter="${4:-}"
+    query_filter="${5:-}"
+
+    endpoint="$(
+      node -e '
+        const params = new URLSearchParams();
+        const [status, city, category, q] = process.argv.slice(1);
+        if (status) params.set("status", status);
+        if (city) params.set("city", city);
+        if (category) params.set("category", category);
+        if (q) params.set("q", q);
+        const query = params.toString();
+        process.stdout.write(query ? `merchants?${query}` : "merchants");
+      ' "$status_filter" "$city_filter" "$category_filter" "$query_filter"
+    )"
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "$endpoint")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:get)
+    merchant_id="${2:-}"
+
+    if [[ -z "$merchant_id" ]]; then
+      echo "Usage: npm run ops -- merchant:get <merchantId>" >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:update)
+    merchant_id="${2:-}"
+    name="${3:-}"
+    category="${4:-}"
+    city="${5:-}"
+    contact_email="${6:-}"
+    status_value="${7:-}"
+
+    if [[ -z "$merchant_id" ]]; then
+      echo "Usage: npm run ops -- merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]" >&2
+      echo "Use - to skip fields you do not want to change." >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [name, category, city, contactEmail, status] = process.argv.slice(1);
+      const payload = {};
+      if (name && name !== "-") payload.name = name;
+      if (category && category !== "-") payload.category = category;
+      if (city && city !== "-") payload.city = city;
+      if (contactEmail && contactEmail !== "-") payload.contactEmail = contactEmail;
+      if (status && status !== "-") payload.status = status;
+      process.stdout.write(JSON.stringify(payload));
+    ' "$name" "$category" "$city" "$contact_email" "$status_value")"
+
+    if [[ "$payload" == "{}" ]]; then
+      echo "No update fields provided. Use - to skip individual fields, but provide at least one real change." >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
     ;;
 
   set-operator)

@@ -19,10 +19,14 @@
     "ops:refresh": "bash scripts/ops.sh refresh",
     "ops:token": "bash scripts/ops.sh token",
     "ops:auth-header": "bash scripts/ops.sh auth-header",
+    "ops:merchant:create": "bash scripts/ops.sh merchant:create",
+    "ops:merchant:list": "bash scripts/ops.sh merchant:list",
+    "ops:merchant:get": "bash scripts/ops.sh merchant:get",
+    "ops:merchant:update": "bash scripts/ops.sh merchant:update",
     "ops:set-operator": "bash scripts/ops.sh set-operator",
     "operator:set": "tsx scripts/set-operator.ts",
     "test": "jest --runInBand",
-    "test:http": "RUN_HTTP_TESTS=true jest --runInBand tests/auth.http.test.ts",
+    "test:http": "RUN_HTTP_TESTS=true jest --runInBand tests/*.http.test.ts",
     "test:watch": "jest --watch"
   },
   "dependencies": {

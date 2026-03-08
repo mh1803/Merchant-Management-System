@@ -72,6 +72,31 @@ npm run ops -- token access
 npm run ops -- auth-header
 ```
 
+- Create a merchant:
+```bash
+npm run ops -- merchant:create "Atlas Pharmacy" Pharmacy Casablanca owner@atlas.ma
+```
+You must be logged in first.
+
+- List merchants with optional filters:
+```bash
+npm run ops -- merchant:list Active Casablanca
+```
+You must be logged in first.
+
+- Get a merchant by id:
+```bash
+npm run ops -- merchant:get <merchantId>
+```
+You must be logged in first.
+
+- Update a merchant:
+```bash
+npm run ops -- merchant:update <merchantId> - - Rabat - Active
+```
+Use `-` to skip fields you do not want to change.
+You must be logged in first.
+
 - Optional: change API base URL when needed:
 ```bash
 API_URL=http://localhost:3000 npm run ops -- health
@@ -83,6 +108,19 @@ API_URL=http://localhost:3000 npm run ops -- health
 - `POST /auth/refresh`
   - body: `{ "refreshToken": "<token>" }`
   - terminal CLI can use the saved refresh token automatically
+
+## Merchant Endpoints
+- `POST /merchants`
+  - requires bearer token
+  - body: `{ "name": "...", "category": "...", "city": "...", "contactEmail": "...", "status": "Pending KYB|Active|Suspended" }`
+- `GET /merchants`
+  - requires bearer token
+  - optional query params: `status`, `city`, `category`, `q`
+- `GET /merchants/:merchantId`
+  - requires bearer token
+- `PATCH /merchants/:merchantId`
+  - requires bearer token
+  - body: any subset of merchant fields to update
 
 ## Operator Setup
 Use the CLI to create or update operators in the configured auth backend (`AUTH_STORAGE`, default `postgres`):
