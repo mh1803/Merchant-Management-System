@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
+require('dotenv').config();
+
 const Joi = require('joi');
+const bcrypt = require('bcryptjs');
+const { createOrUpdateOperator } = require('../src/db/authRepository');
+const { pool } = require('../src/db');
 
 function argValue(flag) {
   const index = process.argv.indexOf(flag);
@@ -16,12 +17,6 @@ function argValue(flag) {
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
-}
-
-function getOperatorsFilePath() {
-  return process.env.OPERATORS_FILE
-    ? path.resolve(process.cwd(), process.env.OPERATORS_FILE)
-    : path.resolve(process.cwd(), 'data/operators.json');
 }
 
 async function run() {
@@ -47,43 +42,22 @@ async function run() {
     process.exit(1);
   }
 
-  const operatorsFile = getOperatorsFilePath();
-  fs.mkdirSync(path.dirname(operatorsFile), { recursive: true });
-
-  let operators = [];
-  if (fs.existsSync(operatorsFile)) {
-    const raw = fs.readFileSync(operatorsFile, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Operator file must be an array: ${operatorsFile}`);
-    }
-    operators = parsed;
-  }
-
   const passwordHash = await bcrypt.hash(password, 10);
-  const existingIndex = operators.findIndex(
-    (operator) => normalizeEmail(operator.email) === email
-  );
-
-  const nextRecord = {
-    id: existingIndex >= 0 && operators[existingIndex].id ? operators[existingIndex].id : crypto.randomUUID(),
+  const operator = await createOrUpdateOperator({
     email,
     passwordHash,
     role
-  };
+  });
 
-  if (existingIndex >= 0) {
-    operators[existingIndex] = nextRecord;
-  } else {
-    operators.push(nextRecord);
-  }
-
-  fs.writeFileSync(operatorsFile, `${JSON.stringify(operators, null, 2)}\n`, 'utf8');
-  console.log(`Operator saved: ${email} (${role}) -> ${operatorsFile}`);
-  console.log('Restart the server to load new or updated operators.');
+  console.log(`Operator saved: ${operator.email} (${operator.role}) [${operator.id}]`);
+  console.log(`Auth storage backend: ${process.env.AUTH_STORAGE || 'postgres'}`);
 }
 
-run().catch((error) => {
-  console.error(error.message || error);
-  process.exit(1);
-});
+run()
+  .catch((error) => {
+    console.error(error.message || error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await pool.end();
+  });

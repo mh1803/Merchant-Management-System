@@ -10,10 +10,13 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "db:migrate": "node scripts/migrate.js",
     "ops": "bash scripts/ops.sh",
     "ops:health": "bash scripts/ops.sh health",
     "ops:login": "bash scripts/ops.sh login",
     "ops:refresh": "bash scripts/ops.sh refresh",
+    "ops:token": "bash scripts/ops.sh token",
+    "ops:auth-header": "bash scripts/ops.sh auth-header",
     "ops:set-operator": "bash scripts/ops.sh set-operator",
     "operator:set": "node scripts/set-operator.js",
     "test": "jest --runInBand",
