@@ -1,5 +1,7 @@
 node_modules/
 .env
+.auth/
+.local-guide.md
 coverage/
 .DS_Store
 npm-debug.log*
