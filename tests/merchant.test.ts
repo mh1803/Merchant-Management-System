@@ -7,10 +7,12 @@ import {
   searchMerchants
 } from '../src/services/merchantService';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
+import { resetHistoryStoreForTests } from '../src/db/historyRepository';
 
 describe('Merchant service', () => {
   beforeEach(() => {
     resetMerchantStoreForTests();
+    resetHistoryStoreForTests();
   });
 
   it('creates a merchant with default status', async () => {
@@ -86,6 +88,9 @@ describe('Merchant service', () => {
     const updated = await editMerchant(created.id, {
       city: 'Rabat',
       status: 'Active'
+    }, {
+      operatorId: 'operator-1',
+      email: 'admin@example.com'
     });
 
     expect(updated.city).toBe('Rabat');

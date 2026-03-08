@@ -6,6 +6,7 @@ import request from 'supertest';
 import app from '../src/app';
 import { createOrUpdateOperator, resetAuthStoreForTests } from '../src/db/authRepository';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
+import { resetHistoryStoreForTests } from '../src/db/historyRepository';
 import { issueAccessToken } from '../src/services/tokenService';
 
 const describeHttp = process.env.RUN_HTTP_TESTS === 'true' ? describe : describe.skip;
@@ -16,6 +17,7 @@ describeHttp('Merchant HTTP API', () => {
   beforeEach(async () => {
     resetAuthStoreForTests();
     resetMerchantStoreForTests();
+    resetHistoryStoreForTests();
 
     const operator = await createOrUpdateOperator({
       email: 'admin@example.com',
