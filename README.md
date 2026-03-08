@@ -36,6 +36,7 @@ For a one-command local start that runs migrations first, use `npm run start:dev
 - `npm start` - run server
 - `npm run db:migrate` - apply SQL migrations
 - `npm test` - run tests
+- `npm run test:http` - run HTTP endpoint tests with `supertest`
 - `npm run ops -- help` - list quick operations commands
 
 ## Quick Terminal Commands
