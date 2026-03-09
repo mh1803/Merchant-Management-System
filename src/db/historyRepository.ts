@@ -59,6 +59,7 @@ export async function createMerchantHistoryEntry(input: {
   };
 
   if (storageMode() === 'memory') {
+    // Tests append history in-order so service assertions see the same sequence as production reads.
     const current = memoryState.historyByMerchantId.get(input.merchantId) || [];
     current.push(entry);
     memoryState.historyByMerchantId.set(input.merchantId, current);

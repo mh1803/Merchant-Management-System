@@ -62,6 +62,7 @@ export async function getOperatorByEmail(email: string): Promise<OperatorRecord 
   const normalizedEmail = normalizeEmail(email);
 
   if (storageMode() === 'memory') {
+    // Tests can exercise auth behavior without needing a real database connection.
     const operatorId = memoryState.operatorIdByEmail.get(normalizedEmail);
     if (!operatorId) {
       return null;
@@ -88,6 +89,8 @@ export async function createOrUpdateOperator({
   role = 'operator',
   id = crypto.randomUUID()
 }: CreateOrUpdateOperatorInput): Promise<OperatorRecord> {
+  // Operator provisioning is idempotent so the CLI can safely be used to create or rotate
+  // credentials for the same email without a separate "create vs update" path.
   const normalizedEmail = normalizeEmail(email);
 
   if (storageMode() === 'memory') {
@@ -132,6 +135,7 @@ export async function setOperatorLoginState(
   operatorId: string,
   { failedLoginAttempts, lockoutUntil }: LoginStatePatch
 ): Promise<OperatorRecord | null> {
+  // Login state is persisted alongside the operator so lockout enforcement survives process restarts.
   if (storageMode() === 'memory') {
     const current = memoryState.operatorsById.get(operatorId);
     if (!current) {
@@ -168,6 +172,7 @@ export async function saveRefreshSession({
   operatorId,
   expiresAt
 }: RefreshSessionRecord): Promise<void> {
+  // Refresh sessions are indexed by JWT ID so token rotation can revoke one specific token instance.
   if (storageMode() === 'memory') {
     memoryState.refreshSessionsByJti.set(jti, {
       jti,

@@ -12,6 +12,8 @@ import { issueAccessToken, issueRefreshToken, verifyRefreshToken } from './token
 import { AuthTokens, LoginInput, OperatorRecord, RefreshInput } from '../types/auth';
 
 async function buildAuthResponse(operator: OperatorRecord): Promise<AuthTokens> {
+  // Access tokens stay short-lived, while refresh tokens are backed by server-side state
+  // so logout, expiry, and replay checks can be enforced centrally.
   const accessToken = issueAccessToken({
     operatorId: operator.id,
     email: operator.email,
@@ -24,6 +26,7 @@ async function buildAuthResponse(operator: OperatorRecord): Promise<AuthTokens> 
     role: operator.role
   });
 
+  // Refresh sessions are persisted so used or expired tokens can be rejected server-side.
   await saveRefreshSession({
     jti,
     operatorId: operator.id,
@@ -47,6 +50,8 @@ export function lockoutRetrySeconds(operator: OperatorRecord): number {
 }
 
 export async function login({ email, password }: LoginInput): Promise<AuthTokens> {
+  // Login verifies credentials, applies lockout policy, and normalizes all auth failures
+  // into the same public response so invalid usernames are not distinguishable.
   const operator = await getOperatorByEmail(email);
 
   if (!operator) {
@@ -88,6 +93,8 @@ export async function login({ email, password }: LoginInput): Promise<AuthTokens
 }
 
 export async function refresh({ refreshToken }: RefreshInput): Promise<AuthTokens> {
+  // Refresh is a stateful flow: the JWT must be valid and its persisted session must still
+  // exist for the token to be accepted.
   let payload;
 
   try {
@@ -110,6 +117,7 @@ export async function refresh({ refreshToken }: RefreshInput): Promise<AuthToken
     throw new AppError(401, 'Refresh token is no longer valid', 'INVALID_REFRESH_TOKEN');
   }
 
+  // Rotation invalidates the submitted refresh token before a replacement is issued.
   await deleteRefreshSession(payload.jti);
 
   const operator = await getOperatorByEmail(payload.email);

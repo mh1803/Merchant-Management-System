@@ -25,6 +25,7 @@ export async function authenticate(
       throw new AppError(401, 'Invalid access token', 'INVALID_ACCESS_TOKEN');
     }
 
+    // Downstream controllers and services rely on this normalized operator context.
     res.locals.operator = {
       id: operator.id,
       email: operator.email,

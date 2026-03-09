@@ -53,6 +53,8 @@ function normalizeFilter(value: string | undefined): string | undefined {
 }
 
 export async function createMerchant(input: CreateMerchantInput): Promise<MerchantRecord> {
+  // Merchant creation sets the authoritative defaults here so callers cannot bypass
+  // initial lifecycle state or pricing-tier assumptions.
   const merchantId = crypto.randomUUID();
   const now = new Date().toISOString();
   const merchant: MerchantRecord = {
@@ -114,6 +116,7 @@ export async function getMerchantById(merchantId: string): Promise<MerchantRecor
 
 export async function listMerchants(filters: MerchantFilters): Promise<MerchantRecord[]> {
   if (storageMode() === 'memory') {
+    // The in-memory branch mirrors the SQL filter semantics used in production queries.
     const normalizedFilters: MerchantFilters = {
       status: filters.status,
       city: normalizeFilter(filters.city)?.toLowerCase(),
@@ -185,6 +188,7 @@ export async function listMerchants(filters: MerchantFilters): Promise<MerchantR
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  // SQL is assembled incrementally to support optional filters without duplicating query text.
   const { rows } = await pool.query<MerchantRow>(
     `SELECT id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at
      FROM merchants
@@ -200,6 +204,8 @@ export async function updateMerchant(
   merchantId: string,
   input: UpdateMerchantInput
 ): Promise<MerchantRecord | null> {
+  // Repository updates merge partial input onto the existing record so service-layer
+  // validation can stay focused on business rules instead of persistence details.
   if (storageMode() === 'memory') {
     const current = memoryState.merchantsById.get(merchantId);
     if (!current) {

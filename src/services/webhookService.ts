@@ -69,6 +69,7 @@ async function deliverWebhookToSubscription(input: {
     payload: input.payload
   });
 
+  // Retries are tracked against a single delivery record so failures remain auditable.
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const timestamp = new Date().toISOString();
     const signature = signPayload(input.secret, timestamp, input.payload);
@@ -104,6 +105,8 @@ async function deliverWebhookToSubscription(input: {
 export async function dispatchMerchantStatusWebhooks(
   event: MerchantStatusWebhookEvent
 ): Promise<void> {
+  // A single status change fans out to every active subscriber using the same payload shape
+  // so receivers can build stable integrations around a small event contract.
   const subscriptions = await listActiveWebhookSubscriptions();
   if (subscriptions.length === 0) {
     return;
@@ -131,6 +134,7 @@ export async function dispatchMerchantStatusWebhooks(
 }
 
 export function queueMerchantStatusWebhookDispatch(event: MerchantStatusWebhookEvent): void {
+  // Dispatch is detached from the request/response cycle to avoid blocking merchant updates.
   const job = Promise.resolve()
     .then(async () => {
       await dispatchMerchantStatusWebhooks(event);

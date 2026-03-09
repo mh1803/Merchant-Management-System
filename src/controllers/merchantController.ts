@@ -57,6 +57,8 @@ export async function createMerchantController(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Controllers stay thin: validate shape, collect route context, and delegate all business
+    // decisions to the service layer.
     const value = await validateWithSchema(createMerchantSchema, req.body);
     const merchant = await addMerchant(value);
     res.status(201).json(merchant);
@@ -71,6 +73,7 @@ export async function listMerchantsController(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Query params are validated here so service code receives normalized optional filters.
     const value = await validateWithSchema(listMerchantSchema, req.query);
     const merchants = await searchMerchants(value);
     res.status(200).json({ items: merchants });
@@ -105,6 +108,7 @@ export async function updateMerchantController(
     const merchantId = Array.isArray(req.params.merchantId)
       ? req.params.merchantId[0]
       : req.params.merchantId;
+    // Auth middleware attaches the acting operator once so controllers do not need to re-parse tokens.
     const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
     const merchant = await editMerchant(merchantId, value, {
       operatorId: actor.id,

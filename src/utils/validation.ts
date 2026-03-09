@@ -9,6 +9,7 @@ export async function validateWithSchema<T>(
     return await schema.parseAsync(input);
   } catch (error) {
     if (error instanceof ZodError) {
+      // Controllers use one shared validation path so API error responses stay consistent.
       throw new AppError(400, 'Request validation failed', 'VALIDATION_ERROR', {
         details: error.issues.map((issue) => issue.message)
       });

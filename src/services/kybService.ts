@@ -25,6 +25,7 @@ export async function recordMerchantDocument(
   input: RecordMerchantDocumentInput
 ): Promise<MerchantDocumentRecord> {
   await assertMerchantExists(merchantId);
+  // Upload and verification are separate steps so operators explicitly approve each document.
   return upsertMerchantDocument({
     merchantId,
     type: input.type,

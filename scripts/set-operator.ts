@@ -48,6 +48,7 @@ async function run(): Promise<void> {
     process.exit(1);
   }
 
+  // Operators are provisioned out-of-band so the API has no public registration surface.
   const passwordHash = await bcrypt.hash(password, 10);
   const operator = await createOrUpdateOperator({
     email,
