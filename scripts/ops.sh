@@ -175,6 +175,9 @@ Commands:
   kyb:verify-doc <merchantId> <type> <true|false>
       Mark a merchant KYB document verified or unverified. You must be logged in.
 
+  webhook:subscribe <url> <secret>
+      Register or update a webhook subscription. You must be logged in.
+
   set-operator <email> <password> [role]
       Create or update an operator in auth storage.
       Requirements: valid email, password >= 8 chars, role in [admin, operator].
@@ -196,6 +199,7 @@ Examples:
   npm run ops -- kyb:list-docs <merchantId>
   npm run ops -- kyb:get-doc <merchantId> business_registration
   npm run ops -- kyb:verify-doc <merchantId> business_registration true
+  npm run ops -- webhook:subscribe https://example.com/webhook shared-secret
 USAGE
 }
 
@@ -452,6 +456,26 @@ case "$cmd" in
     ' "$verified_value")"
 
     mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id/documents/$document_type/verify" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  webhook:subscribe)
+    webhook_url="${2:-}"
+    webhook_secret="${3:-}"
+
+    if [[ -z "$webhook_url" || -z "$webhook_secret" ]]; then
+      echo "Usage: npm run ops -- webhook:subscribe <url> <secret>" >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [url, secret] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ url, secret }));
+    ' "$webhook_url" "$webhook_secret")"
+
+    mapfile -t response < <(request_with_saved_access_token "POST" "webhooks/subscriptions" "$payload")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
     print_response "$status" "$body"
