@@ -103,4 +103,17 @@ describeHttp('KYB HTTP API', () => {
     expect(response.status).toBe(400);
     expect(response.body.code).toBe('VALIDATION_ERROR');
   });
+
+  it('rejects malformed merchant ids with validation error', async () => {
+    const response = await request(app)
+      .post('/merchants/not-a-uuid/documents')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        type: 'business_registration',
+        fileName: 'business-reg.pdf'
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+  });
 });

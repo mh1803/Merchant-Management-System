@@ -16,6 +16,19 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return res.status(error.statusCode).json(response);
   }
 
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === '22P02'
+  ) {
+    return res.status(400).json({
+      code: 'VALIDATION_ERROR',
+      message: 'Request validation failed',
+      details: ['Invalid identifier format']
+    });
+  }
+
   // Anything else is treated as an unhandled server failure and intentionally not exposed in detail.
   return res.status(500).json({
     code: 'INTERNAL_SERVER_ERROR',

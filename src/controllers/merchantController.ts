@@ -16,7 +16,7 @@ import {
   UpdateMerchantPricingTierInput,
   UpdateMerchantInput
 } from '../types/merchant';
-import { validateWithSchema, z } from '../utils/validation';
+import { validateUuidParam, validateWithSchema, z } from '../utils/validation';
 
 const statusValues = ['Pending KYB', 'Active', 'Suspended'] as const satisfies MerchantStatus[];
 const pricingTierValues = ['standard', 'premium', 'enterprise'] as const satisfies MerchantPricingTier[];
@@ -50,6 +50,13 @@ const listMerchantSchema = z.object({
 const updatePricingTierSchema = z.object({
   pricingTier: z.enum(pricingTierValues)
 }) satisfies z.ZodType<UpdateMerchantPricingTierInput>;
+
+async function merchantIdFromRequest(req: Request): Promise<string> {
+  const rawValue = Array.isArray(req.params.merchantId)
+    ? req.params.merchantId[0]
+    : req.params.merchantId;
+  return validateUuidParam(rawValue, 'merchantId');
+}
 
 export async function createMerchantController(
   req: Request,
@@ -91,7 +98,7 @@ export async function getMerchantController(
     const merchantId = Array.isArray(req.params.merchantId)
       ? req.params.merchantId[0]
       : req.params.merchantId;
-    const merchant = await getMerchantDetails(merchantId);
+    const merchant = await getMerchantDetails(await validateUuidParam(merchantId, 'merchantId'));
     res.status(200).json(merchant);
   } catch (error) {
     next(error);
@@ -105,9 +112,7 @@ export async function updateMerchantController(
 ): Promise<void> {
   try {
     const value = await validateWithSchema(updateMerchantSchema, req.body);
-    const merchantId = Array.isArray(req.params.merchantId)
-      ? req.params.merchantId[0]
-      : req.params.merchantId;
+    const merchantId = await merchantIdFromRequest(req);
     // Auth middleware attaches the acting operator once so controllers do not need to re-parse tokens.
     const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
     const merchant = await editMerchant(merchantId, value, {
@@ -128,9 +133,7 @@ export async function updateMerchantPricingTierController(
 ): Promise<void> {
   try {
     const value = await validateWithSchema(updatePricingTierSchema, req.body);
-    const merchantId = Array.isArray(req.params.merchantId)
-      ? req.params.merchantId[0]
-      : req.params.merchantId;
+    const merchantId = await merchantIdFromRequest(req);
     const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
     const merchant = await changeMerchantPricingTier(merchantId, value, {
       operatorId: actor.id,
@@ -149,9 +152,7 @@ export async function deleteMerchantController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const merchantId = Array.isArray(req.params.merchantId)
-      ? req.params.merchantId[0]
-      : req.params.merchantId;
+    const merchantId = await merchantIdFromRequest(req);
     const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
     const result = await removeMerchant(merchantId, {
       operatorId: actor.id,

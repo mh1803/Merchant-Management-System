@@ -10,7 +10,7 @@ import {
   RecordMerchantDocumentInput,
   VerifyMerchantDocumentInput
 } from '../types/kyb';
-import { validateWithSchema, z } from '../utils/validation';
+import { validateUuidParam, validateWithSchema, z } from '../utils/validation';
 
 const documentTypes = [
   'bank_account_proof',
@@ -27,14 +27,17 @@ const verifyDocumentSchema = z.object({
   verified: z.boolean()
 }) satisfies z.ZodType<VerifyMerchantDocumentInput>;
 
-function merchantIdFromRequest(req: Request): string {
-  return Array.isArray(req.params.merchantId) ? req.params.merchantId[0] : req.params.merchantId;
+async function merchantIdFromRequest(req: Request): Promise<string> {
+  const rawValue = Array.isArray(req.params.merchantId) ? req.params.merchantId[0] : req.params.merchantId;
+  return validateUuidParam(rawValue, 'merchantId');
 }
 
-function documentTypeFromRequest(req: Request): MerchantDocumentType {
-  return Array.isArray(req.params.documentType)
-    ? (req.params.documentType[0] as MerchantDocumentType)
-    : (req.params.documentType as MerchantDocumentType);
+async function documentTypeFromRequest(req: Request): Promise<MerchantDocumentType> {
+  const rawValue = Array.isArray(req.params.documentType)
+    ? req.params.documentType[0]
+    : req.params.documentType;
+
+  return validateWithSchema(z.enum(documentTypes), rawValue);
 }
 
 export async function recordMerchantDocumentController(
@@ -44,7 +47,7 @@ export async function recordMerchantDocumentController(
 ): Promise<void> {
   try {
     const value = await validateWithSchema(recordDocumentSchema, req.body);
-    const document = await recordMerchantDocument(merchantIdFromRequest(req), value);
+    const document = await recordMerchantDocument(await merchantIdFromRequest(req), value);
     res.status(201).json(document);
   } catch (error) {
     next(error);
@@ -57,7 +60,7 @@ export async function listMerchantDocumentsController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const documents = await getMerchantDocuments(merchantIdFromRequest(req));
+    const documents = await getMerchantDocuments(await merchantIdFromRequest(req));
     res.status(200).json({ items: documents });
   } catch (error) {
     next(error);
@@ -71,8 +74,8 @@ export async function getMerchantDocumentController(
 ): Promise<void> {
   try {
     const document = await getMerchantDocumentDetails(
-      merchantIdFromRequest(req),
-      documentTypeFromRequest(req)
+      await merchantIdFromRequest(req),
+      await documentTypeFromRequest(req)
     );
     res.status(200).json(document);
   } catch (error) {
@@ -88,8 +91,8 @@ export async function verifyMerchantDocumentController(
   try {
     const value = await validateWithSchema(verifyDocumentSchema, req.body);
     const document = await verifyMerchantDocument(
-      merchantIdFromRequest(req),
-      documentTypeFromRequest(req),
+      await merchantIdFromRequest(req),
+      await documentTypeFromRequest(req),
       value
     );
     res.status(200).json(document);

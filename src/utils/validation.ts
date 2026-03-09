@@ -19,4 +19,11 @@ export async function validateWithSchema<T>(
   }
 }
 
+export async function validateUuidParam(value: unknown, fieldName: string): Promise<string> {
+  return validateWithSchema(
+    z.string().uuid(`${fieldName} must be a valid UUID`),
+    value
+  );
+}
+
 export { z };
