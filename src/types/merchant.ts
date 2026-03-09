@@ -26,11 +26,14 @@ export interface UpdateMerchantInput {
   category?: string;
   city?: string;
   contactEmail?: string;
-  status?: MerchantStatus;
 }
 
 export interface UpdateMerchantPricingTierInput {
   pricingTier: MerchantPricingTier;
+}
+
+export interface UpdateMerchantStatusInput {
+  status: MerchantStatus;
 }
 
 export interface MerchantFilters {

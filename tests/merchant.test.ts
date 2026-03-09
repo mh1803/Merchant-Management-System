@@ -2,6 +2,7 @@ process.env.AUTH_STORAGE = 'memory';
 
 import {
   addMerchant,
+  changeMerchantStatus,
   changeMerchantPricingTier,
   removeMerchant,
   editMerchant,
@@ -94,16 +95,20 @@ describe('Merchant service', () => {
 
     await editMerchant(
       pendingMerchant.id,
+      { city: 'Casablanca Updated' }
+    );
+    await changeMerchantStatus(
+      pendingMerchant.id,
       { status: 'Suspended' },
       { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
     );
-    await editMerchant(
+    await changeMerchantStatus(
       rabatMerchant.id,
       { status: 'Suspended' },
       { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
     );
     await makeMerchantActive(activeMerchant.id);
-    await editMerchant(
+    await changeMerchantStatus(
       activeMerchant.id,
       { status: 'Active' },
       { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
@@ -127,23 +132,12 @@ describe('Merchant service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
-    await makeMerchantActive(created.id);
-
-    const updated = await editMerchant(
-      created.id,
-      {
-        city: 'Rabat',
-        status: 'Active'
-      },
-      {
-        operatorId: 'operator-1',
-        email: 'admin@example.com',
-        role: 'admin'
-      }
-    );
+    const updated = await editMerchant(created.id, {
+      city: 'Rabat'
+    });
 
     expect(updated.city).toBe('Rabat');
-    expect(updated.status).toBe('Active');
+    expect(updated.status).toBe('Pending KYB');
   });
 
   it('rejects activation until all required KYB documents are verified', async () => {
@@ -155,7 +149,7 @@ describe('Merchant service', () => {
     });
 
     await expect(
-      editMerchant(
+      changeMerchantStatus(
         created.id,
         { status: 'Active' },
         { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
@@ -173,14 +167,14 @@ describe('Merchant service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
-    await editMerchant(
+    await changeMerchantStatus(
       created.id,
       { status: 'Suspended' },
       { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
     );
 
     await expect(
-      editMerchant(
+      changeMerchantStatus(
         created.id,
         { status: 'Pending KYB' },
         { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
@@ -188,6 +182,19 @@ describe('Merchant service', () => {
     ).rejects.toMatchObject({
       code: 'INVALID_STATUS_TRANSITION'
     });
+  });
+
+  it('rejects status changes through generic merchant updates', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    const updated = await editMerchant(created.id, { city: 'Rabat' });
+
+    expect(updated.status).toBe('Pending KYB');
   });
 
   it('allows admins to change merchant pricing tier', async () => {

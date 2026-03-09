@@ -7,6 +7,7 @@ import {
   listMerchantHistoryController,
   listMerchantsController,
   updateMerchantPricingTierController,
+  updateMerchantStatusController,
   updateMerchantController
 } from '../controllers/merchantController';
 import {
@@ -26,6 +27,7 @@ merchantRouter.post('/', createMerchantController);
 merchantRouter.get('/', listMerchantsController);
 merchantRouter.get('/:merchantId', getMerchantController);
 merchantRouter.patch('/:merchantId', updateMerchantController);
+merchantRouter.patch('/:merchantId/status', updateMerchantStatusController);
 merchantRouter.delete('/:merchantId', deleteMerchantController);
 merchantRouter.patch('/:merchantId/pricing-tier', updateMerchantPricingTierController);
 merchantRouter.get('/:merchantId/history', listMerchantHistoryController);

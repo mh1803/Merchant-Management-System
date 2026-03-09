@@ -1,7 +1,7 @@
 process.env.AUTH_STORAGE = 'memory';
 
 import { createOrUpdateOperator } from '../src/db/authRepository';
-import { addMerchant, editMerchant } from '../src/services/merchantService';
+import { addMerchant, changeMerchantStatus } from '../src/services/merchantService';
 import {
   listWebhookDeliveriesForTests,
   resetWebhookStoreForTests
@@ -84,7 +84,7 @@ describe('Webhook service', () => {
 
     await makeMerchantActive(merchant.id);
 
-    await editMerchant(
+    await changeMerchantStatus(
       merchant.id,
       { status: 'Active' },
       { operatorId: operator.id, email: operator.email, role: operator.role }
@@ -127,7 +127,7 @@ describe('Webhook service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
-    await editMerchant(
+    await changeMerchantStatus(
       merchant.id,
       { status: 'Suspended' },
       { operatorId: operator.id, email: operator.email, role: operator.role }

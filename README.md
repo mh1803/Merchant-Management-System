@@ -181,9 +181,9 @@ npm run ops -- merchant:list active Casablanca
 npm run ops -- merchant:list active Casablanca - premium
 npm run ops -- merchant:list - - - - atlas
 npm run ops -- merchant:get <merchantId>
-npm run ops -- merchant:update <merchantId> - - Rabat - Active
-npm run ops -- merchant:update <merchantId> - - - - pending
-npm run ops -- merchant:update <merchantId> - - - - "Pending KYB"
+npm run ops -- merchant:update <merchantId> - - Rabat -
+npm run ops -- merchant:set-status <merchantId> active
+npm run ops -- merchant:set-status <merchantId> "Pending KYB"
 npm run ops -- merchant:delete <merchantId>
 npm run ops -- merchant:set-pricing-tier <merchantId> premium
 npm run ops -- merchant:history <merchantId>
@@ -221,6 +221,7 @@ Notes:
 - `merchant:list` arguments are ordered as `[status] [city] [category] [pricingTier] [q]`
 - `q` is a free-text search query across merchant name, category, city, and contact email
 - use `-` in `merchant:update` to skip unchanged fields
+- `merchant:update` changes merchant details only; use `merchant:set-status` for lifecycle changes
 
 ## API Overview
 
@@ -235,6 +236,7 @@ Merchants:
 - `GET /merchants`
 - `GET /merchants/:merchantId`
 - `PATCH /merchants/:merchantId`
+- `PATCH /merchants/:merchantId/status`
 - `DELETE /merchants/:merchantId`
 - `PATCH /merchants/:merchantId/pricing-tier`
 - `GET /merchants/:merchantId/history`

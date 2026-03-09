@@ -23,6 +23,7 @@
     "ops:merchant:list": "bash scripts/ops.sh merchant:list",
     "ops:merchant:get": "bash scripts/ops.sh merchant:get",
     "ops:merchant:update": "bash scripts/ops.sh merchant:update",
+    "ops:merchant:set-status": "bash scripts/ops.sh merchant:set-status",
     "ops:merchant:delete": "bash scripts/ops.sh merchant:delete",
     "ops:merchant:set-pricing-tier": "bash scripts/ops.sh merchant:set-pricing-tier",
     "ops:merchant:history": "bash scripts/ops.sh merchant:history",

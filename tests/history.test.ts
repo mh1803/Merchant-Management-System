@@ -2,6 +2,7 @@ process.env.AUTH_STORAGE = 'memory';
 
 import {
   addMerchant,
+  changeMerchantStatus,
   changeMerchantPricingTier,
   editMerchant
 } from '../src/services/merchantService';
@@ -47,7 +48,7 @@ describe('Merchant status history service', () => {
 
     await makeMerchantActive(merchant.id);
 
-    await editMerchant(
+    await changeMerchantStatus(
       merchant.id,
       { status: 'Active' },
       { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
@@ -73,11 +74,7 @@ describe('Merchant status history service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
-    await editMerchant(
-      merchant.id,
-      { city: 'Rabat' },
-      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
-    );
+    await editMerchant(merchant.id, { city: 'Rabat' });
 
     const history = await getMerchantHistory(merchant.id);
     expect(history).toHaveLength(0);

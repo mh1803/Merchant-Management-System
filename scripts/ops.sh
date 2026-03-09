@@ -271,11 +271,15 @@ Merchant commands:
   merchant:get <merchantId>
       Get a single merchant by id. You must be logged in.
 
-  merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]
+  merchant:update <merchantId> [name] [category] [city] [contactEmail]
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
+      This command does not change merchant status.
+
+  merchant:set-status <merchantId> <status>
+      Change merchant status. You must be logged in.
       Allowed status values: "Pending KYB" (or pending/pending-kyb/pending_kyb/pkyb/pk), "Active", "Suspended".
-      Example: merchant:update <merchantId> - - - - pending
+      Example: merchant:set-status <merchantId> pending
       Transition to Active requires all 3 KYB documents to be present and verified.
 
   merchant:delete <merchantId>
@@ -496,28 +500,22 @@ case "$cmd" in
     category="${4:-}"
     city="${5:-}"
     contact_email="${6:-}"
-    status_value="${*:7}"
 
     if [[ -z "$merchant_id" ]]; then
-      echo "Usage: npm run ops -- merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]" >&2
+      echo "Usage: npm run ops -- merchant:update <merchantId> [name] [category] [city] [contactEmail]" >&2
       echo "Use - to skip fields you do not want to change." >&2
       exit 1
     fi
 
-    if [[ -n "$status_value" && "$status_value" != "-" ]]; then
-      status_value="$(normalize_merchant_status "$status_value")"
-    fi
-
     payload="$(node -e '
-      const [name, category, city, contactEmail, status] = process.argv.slice(1);
+      const [name, category, city, contactEmail] = process.argv.slice(1);
       const payload = {};
       if (name && name !== "-") payload.name = name;
       if (category && category !== "-") payload.category = category;
       if (city && city !== "-") payload.city = city;
       if (contactEmail && contactEmail !== "-") payload.contactEmail = contactEmail;
-      if (status && status !== "-") payload.status = status;
       process.stdout.write(JSON.stringify(payload));
-    ' "$name" "$category" "$city" "$contact_email" "$status_value")"
+    ' "$name" "$category" "$city" "$contact_email")"
 
     if [[ "$payload" == "{}" ]]; then
       echo "No update fields provided. Use - to skip individual fields, but provide at least one real change." >&2
@@ -525,6 +523,28 @@ case "$cmd" in
     fi
 
     mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id" "$payload")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:set-status)
+    merchant_id="${2:-}"
+    status_value="${*:3}"
+
+    if [[ -z "$merchant_id" || -z "$status_value" ]]; then
+      echo "Usage: npm run ops -- merchant:set-status <merchantId> <status>" >&2
+      exit 1
+    fi
+
+    status_value="$(normalize_merchant_status "$status_value")"
+
+    payload="$(node -e '
+      const [status] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ status }));
+    ' "$status_value")"
+
+    mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id/status" "$payload")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
     print_response "$status" "$body"

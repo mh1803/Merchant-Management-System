@@ -228,7 +228,7 @@ export async function updateMerchant(
       category: input.category ?? current.category,
       city: input.city ?? current.city,
       contactEmail: input.contactEmail?.toLowerCase() ?? current.contactEmail,
-      status: input.status ?? current.status,
+      status: current.status,
       pricingTier: current.pricingTier,
       updatedAt: new Date().toISOString()
     };
@@ -247,7 +247,7 @@ export async function updateMerchant(
     category: input.category ?? current.category,
     city: input.city ?? current.city,
     contactEmail: input.contactEmail?.toLowerCase() ?? current.contactEmail,
-    status: input.status ?? current.status,
+    status: current.status,
     pricingTier: current.pricingTier
   };
 
@@ -298,6 +298,37 @@ export async function updateMerchantPricingTier(
      WHERE id = $1
      RETURNING id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at`,
     [merchantId, pricingTier]
+  );
+
+  return mapMerchantFromDb(rows[0]);
+}
+
+export async function updateMerchantStatus(
+  merchantId: string,
+  status: MerchantStatus
+): Promise<MerchantRecord | null> {
+  if (storageMode() === 'memory') {
+    const current = memoryState.merchantsById.get(merchantId);
+    if (!current) {
+      return null;
+    }
+
+    const next: MerchantRecord = {
+      ...current,
+      status,
+      updatedAt: new Date().toISOString()
+    };
+    memoryState.merchantsById.set(merchantId, next);
+    return { ...next };
+  }
+
+  const { rows } = await pool.query<MerchantRow>(
+    `UPDATE merchants
+     SET status = $2,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at`,
+    [merchantId, status]
   );
 
   return mapMerchantFromDb(rows[0]);

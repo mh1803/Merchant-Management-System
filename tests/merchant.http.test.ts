@@ -116,7 +116,7 @@ describeHttp('Merchant HTTP API', () => {
 
     await addRequiredKybDocuments(createActiveCandidateResponse.body.id);
     await request(app)
-      .patch(`/merchants/${createActiveCandidateResponse.body.id}`)
+      .patch(`/merchants/${createActiveCandidateResponse.body.id}/status`)
       .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         status: 'Active'
@@ -149,13 +149,12 @@ describeHttp('Merchant HTTP API', () => {
       .patch(`/merchants/${createResponse.body.id}`)
       .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
-        city: 'Rabat',
-        status: 'Active'
+        city: 'Rabat'
       });
 
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.city).toBe('Rabat');
-    expect(updateResponse.body.status).toBe('Active');
+    expect(updateResponse.body.status).toBe('Pending KYB');
   });
 
   it('rejects activation without verified KYB documents', async () => {
@@ -170,7 +169,7 @@ describeHttp('Merchant HTTP API', () => {
       });
 
     const updateResponse = await request(app)
-      .patch(`/merchants/${createResponse.body.id}`)
+      .patch(`/merchants/${createResponse.body.id}/status`)
       .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         status: 'Active'
@@ -194,6 +193,52 @@ describeHttp('Merchant HTTP API', () => {
 
     expect(createResponse.status).toBe(400);
     expect(createResponse.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects status changes through generic merchant updates', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma'
+      });
+
+    const updateResponse = await request(app)
+      .patch(`/merchants/${createResponse.body.id}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        status: 'Active'
+      });
+
+    expect(updateResponse.status).toBe(400);
+    expect(updateResponse.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('updates merchant status through the dedicated endpoint', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma'
+      });
+
+    await addRequiredKybDocuments(createResponse.body.id);
+
+    const updateResponse = await request(app)
+      .patch(`/merchants/${createResponse.body.id}/status`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        status: 'Active'
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.status).toBe('Active');
   });
 
   it('allows admins to delete merchants', async () => {

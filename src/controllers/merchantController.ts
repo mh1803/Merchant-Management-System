@@ -3,6 +3,7 @@ import { listMerchantHistoryController } from './historyController';
 import {
   addMerchant,
   changeMerchantPricingTier,
+  changeMerchantStatus,
   editMerchant,
   getMerchantDetails,
   removeMerchant,
@@ -14,6 +15,7 @@ import {
   MerchantPricingTier,
   MerchantStatus,
   UpdateMerchantPricingTierInput,
+  UpdateMerchantStatusInput,
   UpdateMerchantInput
 } from '../types/merchant';
 import { validateUuidParam, validateWithSchema, z } from '../utils/validation';
@@ -33,9 +35,9 @@ const updateMerchantSchema = z.object({
   name: z.string().trim().min(2).optional(),
   category: z.string().trim().min(2).optional(),
   city: z.string().trim().min(2).optional(),
-  contactEmail: z.string().email().optional(),
-  status: z.enum(statusValues).optional()
+  contactEmail: z.string().email().optional()
 })
+  .strict()
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided'
   }) satisfies z.ZodType<UpdateMerchantInput>;
@@ -51,6 +53,10 @@ const listMerchantSchema = z.object({
 const updatePricingTierSchema = z.object({
   pricingTier: z.enum(pricingTierValues)
 }) satisfies z.ZodType<UpdateMerchantPricingTierInput>;
+
+const updateStatusSchema = z.object({
+  status: z.enum(statusValues)
+}) satisfies z.ZodType<UpdateMerchantStatusInput>;
 
 async function merchantIdFromRequest(req: Request): Promise<string> {
   const rawValue = Array.isArray(req.params.merchantId)
@@ -114,9 +120,23 @@ export async function updateMerchantController(
   try {
     const value = await validateWithSchema(updateMerchantSchema, req.body);
     const merchantId = await merchantIdFromRequest(req);
-    // Auth middleware attaches the acting operator once so controllers do not need to re-parse tokens.
+    const merchant = await editMerchant(merchantId, value);
+    res.status(200).json(merchant);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateMerchantStatusController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const value = await validateWithSchema(updateStatusSchema, req.body);
+    const merchantId = await merchantIdFromRequest(req);
     const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
-    const merchant = await editMerchant(merchantId, value, {
+    const merchant = await changeMerchantStatus(merchantId, value, {
       operatorId: actor.id,
       email: actor.email,
       role: actor.role

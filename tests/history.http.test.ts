@@ -69,7 +69,7 @@ describeHttp('Merchant status history HTTP API', () => {
     await addRequiredKybDocuments(createResponse.body.id);
 
     await request(app)
-      .patch(`/merchants/${createResponse.body.id}`)
+      .patch(`/merchants/${createResponse.body.id}/status`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         status: 'Active'

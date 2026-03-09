@@ -9,7 +9,8 @@ import {
   getMerchantById,
   listMerchants,
   updateMerchant,
-  updateMerchantPricingTier
+  updateMerchantPricingTier,
+  updateMerchantStatus
 } from '../db/merchantRepository';
 import { deleteMerchantDocuments, listMerchantDocuments } from '../db/kybRepository';
 import { deleteMerchantDocumentVerificationHistory } from '../db/kybHistoryRepository';
@@ -22,6 +23,7 @@ import {
   MerchantRecord,
   MerchantStatus,
   UpdateMerchantPricingTierInput,
+  UpdateMerchantStatusInput,
   UpdateMerchantInput
 } from '../types/merchant';
 import { MerchantDocumentType } from '../types/kyb';
@@ -105,27 +107,13 @@ export async function searchMerchants(filters: MerchantFilters): Promise<Merchan
 
 export async function editMerchant(
   merchantId: string,
-  input: UpdateMerchantInput,
-  actor?: StatusChangeActor
+  input: UpdateMerchantInput
 ): Promise<MerchantRecord> {
-  // Merchant updates are the main lifecycle entrypoint: this method validates transitions,
-  // writes immutable history, and triggers webhooks when relevant status changes occur.
+  // Generic merchant updates are limited to editable profile fields. Lifecycle actions
+  // like status transitions are handled through dedicated service methods.
   const current = await getMerchantById(merchantId);
   if (!current) {
     throw new AppError(404, 'Merchant not found', 'MERCHANT_NOT_FOUND');
-  }
-
-  const statusWillChange = typeof input.status !== 'undefined' && input.status !== current.status;
-  if (statusWillChange && !actor) {
-    throw new AppError(
-      400,
-      'Status changes must include the acting operator',
-      'STATUS_CHANGE_ACTOR_REQUIRED'
-    );
-  }
-
-  if (statusWillChange && input.status) {
-    await assertValidStatusTransition(merchantId, current.status, input.status);
   }
 
   const merchant = await updateMerchant(merchantId, input);
@@ -133,30 +121,52 @@ export async function editMerchant(
     throw new AppError(404, 'Merchant not found', 'MERCHANT_NOT_FOUND');
   }
 
-  if (statusWillChange && actor) {
-    const changedAt = new Date().toISOString();
+  return merchant;
+}
 
-    // History is written before webhook fan-out so the audit trail survives delivery failures.
-    await createMerchantHistoryEntry({
+export async function changeMerchantStatus(
+  merchantId: string,
+  input: UpdateMerchantStatusInput,
+  actor: StatusChangeActor
+): Promise<MerchantRecord> {
+  const current = await getMerchantById(merchantId);
+  if (!current) {
+    throw new AppError(404, 'Merchant not found', 'MERCHANT_NOT_FOUND');
+  }
+
+  await assertValidStatusTransition(merchantId, current.status, input.status);
+
+  const merchant = await updateMerchantStatus(merchantId, input.status);
+  if (!merchant) {
+    throw new AppError(404, 'Merchant not found', 'MERCHANT_NOT_FOUND');
+  }
+
+  if (merchant.status === current.status) {
+    return merchant;
+  }
+
+  const changedAt = new Date().toISOString();
+
+  // History is written before webhook fan-out so the audit trail survives delivery failures.
+  await createMerchantHistoryEntry({
+    merchantId,
+    fieldName: 'status',
+    previousValue: current.status,
+    newValue: merchant.status,
+    changedByOperatorId: actor.operatorId,
+    changedByEmail: actor.email
+  });
+
+  if (merchant.status === 'Active' || merchant.status === 'Suspended') {
+    // Webhooks are queued asynchronously to keep the primary request path fast.
+    queueMerchantStatusWebhookDispatch({
+      eventType: merchant.status === 'Active' ? 'merchant.approved' : 'merchant.suspended',
       merchantId,
-      fieldName: 'status',
-      previousValue: current.status,
-      newValue: merchant.status,
-      changedByOperatorId: actor.operatorId,
-      changedByEmail: actor.email
+      merchantName: merchant.name,
+      previousStatus: current.status,
+      newStatus: merchant.status,
+      changedAt
     });
-
-    if (merchant.status === 'Active' || merchant.status === 'Suspended') {
-      // Webhooks are queued asynchronously to keep the primary request path fast.
-      queueMerchantStatusWebhookDispatch({
-        eventType: merchant.status === 'Active' ? 'merchant.approved' : 'merchant.suspended',
-        merchantId,
-        merchantName: merchant.name,
-        previousStatus: current.status,
-        newStatus: merchant.status,
-        changedAt
-      });
-    }
   }
 
   return merchant;
