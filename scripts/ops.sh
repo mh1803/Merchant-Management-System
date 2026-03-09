@@ -108,6 +108,27 @@ request_with_saved_access_token() {
   request_json "$method" "$endpoint" "$payload" "Authorization: Bearer $access_token"
 }
 
+normalize_kyb_type() {
+  local document_type="$1"
+
+  case "$document_type" in
+    br|business_registration)
+      printf 'business_registration\n'
+      ;;
+    oid|owner_identity_document)
+      printf 'owner_identity_document\n'
+      ;;
+    bap|bank_account_proof)
+      printf 'bank_account_proof\n'
+      ;;
+    *)
+      echo "Invalid KYB type: $document_type" >&2
+      echo "Allowed types: br|business_registration, oid|owner_identity_document, bap|bank_account_proof" >&2
+      exit 1
+      ;;
+  esac
+}
+
 print_response() {
   local status="$1"
   local body="$2"
@@ -125,15 +146,40 @@ print_response() {
 usage() {
   cat <<'USAGE'
 Usage:
+  npm run ops -- <section:help>
   npm run ops -- <command> [args]
 
-Commands:
+Sections:
+  auth:help
+      Login, refresh, saved-token, and operator commands.
+
+  merchant:help
+      Merchant CRUD, pricing tier, and history commands.
+
+  kyb:help
+      Merchant KYB document commands.
+
+  webhook:help
+      Webhook subscription commands.
+
+Quick start:
+  npm run ops -- auth:help
+  npm run ops -- merchant:help
+  npm run ops -- kyb:help
+  npm run ops -- webhook:help
+
+Top-level commands:
   help
-      Show this help message.
+      Show this overview.
 
   health
       Check API health endpoint.
+USAGE
+}
 
+usage_auth() {
+  cat <<'USAGE'
+Auth commands:
   login <email> <password>
       Login operator, print tokens, and save them to local secure storage.
 
@@ -147,6 +193,16 @@ Commands:
   auth-header
       Print the Authorization header using the saved access token.
 
+  set-operator <email> <password> [role]
+      Create or update an operator in auth storage.
+      Requirements: valid email, password >= 8 chars, role in [admin, operator].
+      Uses AUTH_STORAGE backend (postgres by default).
+USAGE
+}
+
+usage_merchant() {
+  cat <<'USAGE'
+Merchant commands:
   merchant:create <name> <category> <city> <contactEmail>
       Create a merchant. You must be logged in.
 
@@ -169,26 +225,34 @@ Commands:
 
   merchant:history <merchantId>
       View immutable merchant status and pricing-tier history. You must be logged in.
+USAGE
+}
 
+usage_kyb() {
+  cat <<'USAGE'
+KYB commands:
   kyb:add-doc <merchantId> <type> <fileName>
       Record or replace a merchant KYB document. You must be logged in.
+      Allowed types: br (business_registration), oid (owner_identity_document), bap (bank_account_proof).
 
   kyb:list-docs <merchantId>
       List merchant KYB documents. You must be logged in.
 
   kyb:get-doc <merchantId> <type>
       Get one merchant KYB document by type. You must be logged in.
+      Allowed types: br (business_registration), oid (owner_identity_document), bap (bank_account_proof).
 
   kyb:verify-doc <merchantId> <type> <true|false>
       Mark a merchant KYB document verified or unverified. You must be logged in.
+      Allowed types: br (business_registration), oid (owner_identity_document), bap (bank_account_proof).
+USAGE
+}
 
+usage_webhook() {
+  cat <<'USAGE'
+Webhook commands:
   webhook:subscribe <url> <secret>
       Register or update a webhook subscription. You must be logged in.
-
-  set-operator <email> <password> [role]
-      Create or update an operator in auth storage.
-      Requirements: valid email, password >= 8 chars, role in [admin, operator].
-      Uses AUTH_STORAGE backend (postgres by default).
 USAGE
 }
 
@@ -197,6 +261,22 @@ cmd="${1:-help}"
 case "$cmd" in
   help|-h|--help)
     usage
+    ;;
+
+  auth:help)
+    usage_auth
+    ;;
+
+  merchant:help)
+    usage_merchant
+    ;;
+
+  kyb:help)
+    usage_kyb
+    ;;
+
+  webhook:help)
+    usage_webhook
     ;;
 
   health)
@@ -422,6 +502,8 @@ case "$cmd" in
       exit 1
     fi
 
+    document_type="$(normalize_kyb_type "$document_type")"
+
     payload="$(node -e '
       const [type, fileName] = process.argv.slice(1);
       process.stdout.write(JSON.stringify({ type, fileName }));
@@ -456,6 +538,8 @@ case "$cmd" in
       exit 1
     fi
 
+    document_type="$(normalize_kyb_type "$document_type")"
+
     mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/documents/$document_type")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
@@ -471,6 +555,8 @@ case "$cmd" in
       echo "Usage: npm run ops -- kyb:verify-doc <merchantId> <type> <true|false>" >&2
       exit 1
     fi
+
+    document_type="$(normalize_kyb_type "$document_type")"
 
     payload="$(node -e '
       const [verified] = process.argv.slice(1);
