@@ -21,7 +21,7 @@ read_saved_token() {
   local token_name="$1"
 
   if [[ ! -f "$TOKEN_FILE" ]]; then
-    echo "No saved tokens found. Run: npm run ops -- login <email> <password>" >&2
+    echo "No saved tokens found. Run: npm run ops -- auth:login <email> <password>" >&2
     exit 1
   fi
 
@@ -108,6 +108,17 @@ request_with_saved_access_token() {
   request_json "$method" "$endpoint" "$payload" "Authorization: Bearer $access_token"
 }
 
+normalize_optional_arg() {
+  local value="${1:-}"
+
+  if [[ "$value" == "-" ]]; then
+    printf '\n'
+    return
+  fi
+
+  printf '%s\n' "$value"
+}
+
 normalize_kyb_type() {
   local document_type="$1"
 
@@ -124,6 +135,48 @@ normalize_kyb_type() {
     *)
       echo "Invalid KYB type: $document_type" >&2
       echo "Allowed types: br|business_registration, oid|owner_identity_document, bap|bank_account_proof" >&2
+      exit 1
+      ;;
+  esac
+}
+
+normalize_merchant_status() {
+  local status_value="$1"
+
+  case "$status_value" in
+    "" )
+      printf '\n'
+      ;;
+    "Pending KYB"|pending|pending-kyb|pending_kyb|pkyb|pk)
+      printf 'Pending KYB\n'
+      ;;
+    "Active"|active)
+      printf 'Active\n'
+      ;;
+    "Suspended"|suspended)
+      printf 'Suspended\n'
+      ;;
+    *)
+      echo "Invalid merchant status: $status_value" >&2
+      echo "Allowed values: Pending KYB|pending|pending-kyb|pending_kyb|pkyb|pk, Active|active, Suspended|suspended" >&2
+      exit 1
+      ;;
+  esac
+}
+
+normalize_pricing_tier() {
+  local pricing_tier="$1"
+
+  case "$pricing_tier" in
+    "" )
+      printf '\n'
+      ;;
+    standard|premium|enterprise)
+      printf '%s\n' "$pricing_tier"
+      ;;
+    *)
+      echo "Invalid pricing tier: $pricing_tier" >&2
+      echo "Allowed pricing tiers: standard, premium, enterprise" >&2
       exit 1
       ;;
   esac
@@ -180,20 +233,20 @@ USAGE
 usage_auth() {
   cat <<'USAGE'
 Auth commands:
-  login <email> <password>
+  auth:login <email> <password>
       Login operator, print tokens, and save them to local secure storage.
 
-  refresh [refreshToken]
+  auth:refresh [refreshToken]
       Rotate refresh token and save the replacement automatically.
       If omitted, the saved refresh token is used.
 
-  token <access|refresh>
+  auth:token <access|refresh>
       Print the currently saved token value.
 
-  auth-header
+  auth:header
       Print the Authorization header using the saved access token.
 
-  set-operator <email> <password> [role]
+  auth:set-operator <email> <password> [role]
       Create or update an operator in auth storage.
       Requirements: valid email, password >= 8 chars, role in [admin, operator].
       Uses AUTH_STORAGE backend (postgres by default).
@@ -205,9 +258,15 @@ usage_merchant() {
 Merchant commands:
   merchant:create <name> <category> <city> <contactEmail>
       Create a merchant. You must be logged in.
+      New merchants always start in Pending KYB.
 
-  merchant:list [status] [city] [category] [q]
+  merchant:list [status] [city] [category] [pricingTier] [q]
       List merchants with optional filters. You must be logged in.
+      Pass - to skip any filter position you do not want to use.
+      Allowed status filter values: "Pending KYB" (or pending/pending-kyb/pending_kyb/pkyb/pk), "Active", "Suspended".
+      Allowed pricing tiers: standard, premium, enterprise.
+      q is a free-text search query across merchant name, category, city, and contact email.
+      Example: merchant:list - Casablanca - premium atlas
 
   merchant:get <merchantId>
       Get a single merchant by id. You must be logged in.
@@ -215,6 +274,8 @@ Merchant commands:
   merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
+      Allowed status values: "Pending KYB" (or pending/pending-kyb/pending_kyb/pkyb/pk), "Active", "Suspended".
+      Example: merchant:update <merchantId> - - - - pending
       Transition to Active requires all 3 KYB documents to be present and verified.
 
   merchant:delete <merchantId>
@@ -240,6 +301,10 @@ KYB commands:
 
   kyb:get-doc <merchantId> <type>
       Get one merchant KYB document by type. You must be logged in.
+      Allowed types: br (business_registration), oid (owner_identity_document), bap (bank_account_proof).
+
+  kyb:history <merchantId> <type>
+      View immutable verification history for one KYB document type. You must be logged in.
       Allowed types: br (business_registration), oid (owner_identity_document), bap (bank_account_proof).
 
   kyb:verify-doc <merchantId> <type> <true|false>
@@ -283,12 +348,12 @@ case "$cmd" in
     curl -sS -i "$API_URL/health"
     ;;
 
-  login)
+  auth:login|login)
     email="${2:-}"
     password="${3:-}"
 
     if [[ -z "$email" || -z "$password" ]]; then
-      echo "Missing arguments. Usage: npm run ops -- login <email> <password>" >&2
+      echo "Missing arguments. Usage: npm run ops -- auth:login <email> <password>" >&2
       exit 1
     fi
 
@@ -305,7 +370,7 @@ case "$cmd" in
     fi
     ;;
 
-  refresh)
+  auth:refresh|refresh)
     refresh_token="${2:-}"
 
     if [[ -z "$refresh_token" ]]; then
@@ -325,11 +390,11 @@ case "$cmd" in
     fi
     ;;
 
-  token)
+  auth:token|token)
     token_kind="${2:-}"
 
     if [[ "$token_kind" != "access" && "$token_kind" != "refresh" ]]; then
-      echo "Usage: npm run ops -- token <access|refresh>" >&2
+      echo "Usage: npm run ops -- auth:token <access|refresh>" >&2
       exit 1
     fi
 
@@ -342,7 +407,7 @@ case "$cmd" in
     fi
     ;;
 
-  auth-header)
+  auth:header|auth-header)
     access_token="$(read_saved_token "accessToken")"
     printf 'Authorization: Bearer %s\n' "$access_token"
     ;;
@@ -373,19 +438,36 @@ case "$cmd" in
     status_filter="${2:-}"
     city_filter="${3:-}"
     category_filter="${4:-}"
-    query_filter="${5:-}"
+    pricing_tier_filter="${5:-}"
+    query_filter="${6:-}"
+
+    city_filter="$(normalize_optional_arg "$city_filter")"
+    category_filter="$(normalize_optional_arg "$category_filter")"
+    pricing_tier_filter="$(normalize_optional_arg "$pricing_tier_filter")"
+    query_filter="$(normalize_optional_arg "$query_filter")"
+
+    if [[ -n "$status_filter" && "$status_filter" != "-" ]]; then
+      status_filter="$(normalize_merchant_status "$status_filter")"
+    else
+      status_filter=""
+    fi
+
+    if [[ -n "$pricing_tier_filter" ]]; then
+      pricing_tier_filter="$(normalize_pricing_tier "$pricing_tier_filter")"
+    fi
 
     endpoint="$(
       node -e '
         const params = new URLSearchParams();
-        const [status, city, category, q] = process.argv.slice(1);
+        const [status, city, category, pricingTier, q] = process.argv.slice(1);
         if (status) params.set("status", status);
         if (city) params.set("city", city);
         if (category) params.set("category", category);
+        if (pricingTier) params.set("pricingTier", pricingTier);
         if (q) params.set("q", q);
         const query = params.toString();
         process.stdout.write(query ? `merchants?${query}` : "merchants");
-      ' "$status_filter" "$city_filter" "$category_filter" "$query_filter"
+      ' "$status_filter" "$city_filter" "$category_filter" "$pricing_tier_filter" "$query_filter"
     )"
 
     mapfile -t response < <(request_with_saved_access_token "GET" "$endpoint")
@@ -414,12 +496,16 @@ case "$cmd" in
     category="${4:-}"
     city="${5:-}"
     contact_email="${6:-}"
-    status_value="${7:-}"
+    status_value="${*:7}"
 
     if [[ -z "$merchant_id" ]]; then
       echo "Usage: npm run ops -- merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]" >&2
       echo "Use - to skip fields you do not want to change." >&2
       exit 1
+    fi
+
+    if [[ -n "$status_value" && "$status_value" != "-" ]]; then
+      status_value="$(normalize_merchant_status "$status_value")"
     fi
 
     payload="$(node -e '
@@ -546,6 +632,23 @@ case "$cmd" in
     print_response "$status" "$body"
     ;;
 
+  kyb:history)
+    merchant_id="${2:-}"
+    document_type="${3:-}"
+
+    if [[ -z "$merchant_id" || -z "$document_type" ]]; then
+      echo "Usage: npm run ops -- kyb:history <merchantId> <type>" >&2
+      exit 1
+    fi
+
+    document_type="$(normalize_kyb_type "$document_type")"
+
+    mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/documents/$document_type/history")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
   kyb:verify-doc)
     merchant_id="${2:-}"
     document_type="${3:-}"
@@ -589,13 +692,13 @@ case "$cmd" in
     print_response "$status" "$body"
     ;;
 
-  set-operator)
+  auth:set-operator|set-operator)
     email="${2:-}"
     password="${3:-}"
     role="${4:-operator}"
 
     if [[ -z "$email" || -z "$password" ]]; then
-      echo "Missing arguments. Usage: npm run ops -- set-operator <email> <password> [role]" >&2
+      echo "Missing arguments. Usage: npm run ops -- auth:set-operator <email> <password> [role]" >&2
       exit 1
     fi
 

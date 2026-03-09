@@ -120,7 +120,7 @@ Defined in `.env.example`:
 - `npm run operator:set -- --email <email> --password <password> --role <role>` create or update an operator
 - `npm test` run service-layer tests
 - `npm run test:http` run HTTP suites
-- `npm run ops -- help [section]` show terminal helper commands by section
+- `npm run ops -- <section:help>` show terminal helper commands by section
 
 ## Testing
 
@@ -153,29 +153,37 @@ npm run ops -- help
 Section help:
 
 ```bash
-npm run ops -- help auth
-npm run ops -- help merchant
-npm run ops -- help kyb
-npm run ops -- help webhook
+npm run ops -- auth:help
+npm run ops -- merchant:help
+npm run ops -- kyb:help
+npm run ops -- webhook:help
 ```
 
 Auth:
 
 ```bash
 npm run ops -- health
-npm run ops -- login admin@example.com StrongPass123
-npm run ops -- refresh
-npm run ops -- token access
-npm run ops -- auth-header
+npm run ops -- auth:set-operator admin@example.com StrongPass123 admin
+npm run ops -- auth:login admin@example.com StrongPass123
+npm run ops -- auth:refresh
+npm run ops -- auth:token access
+npm run ops -- auth:header
 ```
 
 Merchant:
 
 ```bash
 npm run ops -- merchant:create "Atlas Pharmacy" Pharmacy Casablanca owner@atlas.ma
-npm run ops -- merchant:list
+npm run ops -- merchant:list "Pending KYB"
+npm run ops -- merchant:list pending
+npm run ops -- merchant:list - Casablanca
+npm run ops -- merchant:list active Casablanca
+npm run ops -- merchant:list active Casablanca - premium
+npm run ops -- merchant:list - - - - atlas
 npm run ops -- merchant:get <merchantId>
 npm run ops -- merchant:update <merchantId> - - Rabat - Active
+npm run ops -- merchant:update <merchantId> - - - - pending
+npm run ops -- merchant:update <merchantId> - - - - "Pending KYB"
 npm run ops -- merchant:delete <merchantId>
 npm run ops -- merchant:set-pricing-tier <merchantId> premium
 npm run ops -- merchant:history <merchantId>
@@ -189,6 +197,7 @@ npm run ops -- kyb:add-doc <merchantId> owner_identity_document owner-id.pdf
 npm run ops -- kyb:add-doc <merchantId> bank_account_proof bank-proof.pdf
 npm run ops -- kyb:list-docs <merchantId>
 npm run ops -- kyb:get-doc <merchantId> business_registration
+npm run ops -- kyb:history <merchantId> business_registration
 npm run ops -- kyb:verify-doc <merchantId> business_registration true
 ```
 
@@ -203,7 +212,14 @@ Notes:
 - login stores tokens in `.auth/tokens.json`
 - refresh rotates the saved token pair automatically
 - new merchants always start in `Pending KYB`
+- allowed merchant statuses are `Pending KYB`, `Active`, and `Suspended`
+- the CLI also accepts `pending`, `pending-kyb`, `pending_kyb`, `pkyb`, and `pk` for `Pending KYB`
+- allowed pricing tiers are `standard`, `premium`, and `enterprise`
 - merchant creation rejects manual `status` assignment
+- use one of those exact status values, or the documented aliases, when filtering or updating status
+- use `-` in `merchant:list` to skip earlier filter positions, for example `merchant:list - Casablanca`
+- `merchant:list` arguments are ordered as `[status] [city] [category] [pricingTier] [q]`
+- `q` is a free-text search query across merchant name, category, city, and contact email
 - use `-` in `merchant:update` to skip unchanged fields
 
 ## API Overview
@@ -228,6 +244,7 @@ KYB:
 - `POST /merchants/:merchantId/documents`
 - `GET /merchants/:merchantId/documents`
 - `GET /merchants/:merchantId/documents/:documentType`
+- `GET /merchants/:merchantId/documents/:documentType/history`
 - `PATCH /merchants/:merchantId/documents/:documentType/verify`
 
 Webhooks:
