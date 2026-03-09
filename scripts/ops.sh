@@ -189,26 +189,6 @@ Commands:
       Create or update an operator in auth storage.
       Requirements: valid email, password >= 8 chars, role in [admin, operator].
       Uses AUTH_STORAGE backend (postgres by default).
-
-Examples:
-  npm run ops -- health
-  npm run ops -- set-operator admin@example.com StrongPass123 admin
-  npm run ops -- login admin@example.com StrongPass123
-  npm run ops -- refresh
-  npm run ops -- token access
-  npm run ops -- auth-header
-  npm run ops -- merchant:create "Atlas Pharmacy" Pharmacy Casablanca owner@atlas.ma
-  npm run ops -- merchant:list Active Casablanca
-  npm run ops -- merchant:get <merchantId>
-  npm run ops -- merchant:update <merchantId> - - Rabat - Active
-  npm run ops -- merchant:delete <merchantId>
-  npm run ops -- merchant:set-pricing-tier <merchantId> premium
-  npm run ops -- merchant:history <merchantId>
-  npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
-  npm run ops -- kyb:list-docs <merchantId>
-  npm run ops -- kyb:get-doc <merchantId> business_registration
-  npm run ops -- kyb:verify-doc <merchantId> business_registration true
-  npm run ops -- webhook:subscribe https://example.com/webhook shared-secret
 USAGE
 }
 
