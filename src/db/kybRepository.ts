@@ -28,6 +28,7 @@ function mapDocumentFromDb(row?: MerchantDocumentRow): MerchantDocumentRecord | 
     return null;
   }
 
+  // Keep DB naming conventions localized here so services use one consistent document shape.
   return {
     id: row.id,
     merchantId: row.merchant_id,
@@ -64,6 +65,8 @@ export async function upsertMerchantDocument(input: {
     return { ...next };
   }
 
+  // Re-uploading a document intentionally clears verification so stale approvals do not
+  // carry over to newly supplied files.
   const { rows } = await pool.query<MerchantDocumentRow>(
     `INSERT INTO merchant_documents (id, merchant_id, type, file_name, verified, uploaded_at, verified_at)
      VALUES ($1, $2, $3, $4, FALSE, NOW(), NULL)

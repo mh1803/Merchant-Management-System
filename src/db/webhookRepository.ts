@@ -43,6 +43,7 @@ function mapSubscriptionFromDb(row?: WebhookSubscriptionRow): WebhookSubscriptio
     return null;
   }
 
+  // Mapping keeps repository callers decoupled from SQL column naming and timestamp field names.
   return {
     id: row.id,
     url: row.url,
@@ -58,6 +59,7 @@ function mapDeliveryFromDb(row?: WebhookDeliveryRow): WebhookDeliveryRecord | nu
     return null;
   }
 
+  // Delivery rows are converted once here so retry logic can work with a clean domain shape.
   return {
     id: row.id,
     subscriptionId: row.subscription_id,
@@ -157,6 +159,7 @@ export async function createWebhookDelivery(input: {
     return { ...delivery };
   }
 
+  // Deliveries are persisted before any outbound attempt so retry state and failures are visible.
   const { rows } = await pool.query<WebhookDeliveryRow>(
     `INSERT INTO webhook_deliveries (
        id,
@@ -220,6 +223,7 @@ export async function updateWebhookDeliveryAttempt(input: {
     return;
   }
 
+  // Each attempt overwrites the latest delivery state so the record reflects the current retry status.
   await pool.query(
     `UPDATE webhook_deliveries
      SET attempt_count = $2,

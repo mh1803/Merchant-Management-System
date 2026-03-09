@@ -16,6 +16,7 @@ export async function registerWebhookSubscriptionController(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Subscription registration is the only public webhook-management action in this assignment.
     const value = await validateWithSchema(registerWebhookSubscriptionSchema, req.body);
     const subscription = await registerWebhookSubscription(value);
     res.status(201).json(subscription);

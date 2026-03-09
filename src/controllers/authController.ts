@@ -14,6 +14,7 @@ const refreshSchema = z.object({
 
 export async function loginController(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Controllers validate external input and hand off to services; they do not own auth policy.
     const value = await validateWithSchema(loginSchema, req.body);
     const response = await login(value);
     res.status(200).json(response);
@@ -28,6 +29,7 @@ export async function refreshController(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Refresh accepts only the token payload shape and leaves all replay/expiry checks to the service.
     const value = await validateWithSchema(refreshSchema, req.body);
     const response = await refresh(value);
     res.status(200).json(response);

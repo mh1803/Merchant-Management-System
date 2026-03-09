@@ -18,6 +18,8 @@ import {
 
 export const merchantRouter = express.Router();
 
+// Merchant routes share one auth boundary, then branch into core merchant operations,
+// nested KYB document actions, and immutable history reads.
 merchantRouter.use(authenticate);
 merchantRouter.post('/', createMerchantController);
 merchantRouter.get('/', listMerchantsController);

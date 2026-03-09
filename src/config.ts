@@ -3,6 +3,7 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+// Centralized config parsing keeps env handling out of services and makes defaults explicit.
 export const config = {
   accessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret',
   refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret',

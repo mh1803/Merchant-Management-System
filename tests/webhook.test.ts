@@ -18,6 +18,7 @@ import {
 import { recordMerchantDocument, verifyMerchantDocument } from '../src/services/kybService';
 
 async function makeMerchantActive(merchantId: string): Promise<void> {
+  // Webhook tests reuse the same helper so approval scenarios always satisfy activation rules.
   for (const type of [
     'business_registration',
     'owner_identity_document',

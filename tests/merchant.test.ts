@@ -14,6 +14,7 @@ import { resetKybStoreForTests } from '../src/db/kybRepository';
 import { recordMerchantDocument, verifyMerchantDocument } from '../src/services/kybService';
 
 async function makeMerchantActive(merchantId: string): Promise<void> {
+  // Test helper that simulates a merchant fully completing KYB so activation can be exercised.
   for (const type of [
     'business_registration',
     'owner_identity_document',

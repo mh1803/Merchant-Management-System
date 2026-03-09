@@ -4,5 +4,6 @@ import { registerWebhookSubscriptionController } from '../controllers/webhookCon
 
 export const webhookRouter = express.Router();
 
+// Subscription management is protected because only authenticated operators can register destinations.
 webhookRouter.use(authenticate);
 webhookRouter.post('/subscriptions', registerWebhookSubscriptionController);

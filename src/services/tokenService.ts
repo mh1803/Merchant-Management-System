@@ -9,6 +9,7 @@ interface IssuedRefreshToken {
   expiresAt: number;
 }
 
+// Token helpers are kept separate from auth orchestration so JWT concerns remain isolated.
 export function issueAccessToken({ operatorId, email, role }: TokenSubject): string {
   return jwt.sign(
     { sub: operatorId, email, role, tokenType: 'access' },
@@ -18,6 +19,7 @@ export function issueAccessToken({ operatorId, email, role }: TokenSubject): str
 }
 
 export function issueRefreshToken({ operatorId, email, role }: TokenSubject): IssuedRefreshToken {
+  // Refresh tokens get a unique JWT ID so the repository can track one concrete token instance.
   const jti = crypto.randomUUID();
   const token = jwt.sign(
     { sub: operatorId, email, role, tokenType: 'refresh', jti },
@@ -26,6 +28,7 @@ export function issueRefreshToken({ operatorId, email, role }: TokenSubject): Is
   );
 
   const decoded = jwt.decode(token);
+  // Expiry is extracted once here so callers do not need to re-decode the token later.
   const expiresAt =
     decoded && typeof decoded === 'object' && typeof decoded.exp === 'number'
       ? decoded.exp * 1000

@@ -11,6 +11,7 @@ export async function listMerchantHistoryController(
   next: NextFunction
 ): Promise<void> {
   try {
+    // History is read-only, so the controller simply resolves the merchant id and returns the sequence.
     const items = await getMerchantHistory(merchantIdFromRequest(req));
     res.status(200).json({ items });
   } catch (error) {

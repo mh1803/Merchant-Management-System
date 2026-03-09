@@ -27,6 +27,8 @@ function mapHistoryFromDb(row?: MerchantStatusHistoryRow): MerchantHistoryRecord
     return null;
   }
 
+  // Repository mappers keep the rest of the codebase working with domain-shaped objects
+  // instead of leaking raw database column names.
   return {
     id: row.id,
     merchantId: row.merchant_id,
@@ -113,6 +115,7 @@ export async function listMerchantStatusHistory(
     return items.map((item) => ({ ...item }));
   }
 
+  // History is always returned oldest-first so callers see the exact sequence of changes.
   const { rows } = await pool.query<MerchantStatusHistoryRow>(
     `SELECT
        id,
