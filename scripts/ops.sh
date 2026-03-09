@@ -159,6 +159,7 @@ Commands:
   merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
+      Transition to Active requires all 3 KYB documents to be present and verified.
 
   merchant:delete <merchantId>
       Delete a merchant. You must be logged in as an admin.
@@ -167,7 +168,7 @@ Commands:
       Change merchant pricing tier. You must be logged in as an admin.
 
   merchant:history <merchantId>
-      View immutable merchant status history. You must be logged in.
+      View immutable merchant status and pricing-tier history. You must be logged in.
 
   kyb:add-doc <merchantId> <type> <fileName>
       Record or replace a merchant KYB document. You must be logged in.
