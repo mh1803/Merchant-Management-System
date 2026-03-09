@@ -120,7 +120,7 @@ Defined in `.env.example`:
 - `npm run operator:set -- --email <email> --password <password> --role <role>` create or update an operator
 - `npm test` run service-layer tests
 - `npm run test:http` run HTTP suites
-- `npm run ops -- help` show terminal helper commands
+- `npm run ops -- help [section]` show terminal helper commands by section
 
 ## Testing
 
@@ -148,6 +148,15 @@ Show all commands:
 
 ```bash
 npm run ops -- help
+```
+
+Section help:
+
+```bash
+npm run ops -- help auth
+npm run ops -- help merchant
+npm run ops -- help kyb
+npm run ops -- help webhook
 ```
 
 Auth:
@@ -194,6 +203,7 @@ Notes:
 - login stores tokens in `.auth/tokens.json`
 - refresh rotates the saved token pair automatically
 - new merchants always start in `Pending KYB`
+- merchant creation rejects manual `status` assignment
 - use `-` in `merchant:update` to skip unchanged fields
 
 ## API Overview
@@ -225,6 +235,7 @@ Webhooks:
 - `POST /webhooks/subscriptions`
 
 All merchant and webhook endpoints require a bearer token.
+`POST /merchants` does not accept `status`; merchants always start in `Pending KYB`.
 
 ## Project Structure
 
