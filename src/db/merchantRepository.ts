@@ -121,6 +121,7 @@ export async function listMerchants(filters: MerchantFilters): Promise<MerchantR
       status: filters.status,
       city: normalizeFilter(filters.city)?.toLowerCase(),
       category: normalizeFilter(filters.category)?.toLowerCase(),
+      pricingTier: filters.pricingTier,
       q: normalizeFilter(filters.q)?.toLowerCase()
     };
 
@@ -138,6 +139,10 @@ export async function listMerchants(filters: MerchantFilters): Promise<MerchantR
           normalizedFilters.category &&
           merchant.category.toLowerCase() !== normalizedFilters.category
         ) {
+          return false;
+        }
+
+        if (normalizedFilters.pricingTier && merchant.pricingTier !== normalizedFilters.pricingTier) {
           return false;
         }
 
@@ -178,6 +183,11 @@ export async function listMerchants(filters: MerchantFilters): Promise<MerchantR
   if (filters.category) {
     values.push(filters.category);
     whereClauses.push(`LOWER(category) = LOWER($${values.length})`);
+  }
+
+  if (filters.pricingTier) {
+    values.push(filters.pricingTier);
+    whereClauses.push(`pricing_tier = $${values.length}`);
   }
 
   if (filters.q) {

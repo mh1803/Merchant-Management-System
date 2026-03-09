@@ -37,6 +37,7 @@ export interface MerchantFilters {
   status?: MerchantStatus;
   city?: string;
   category?: string;
+  pricingTier?: MerchantPricingTier;
   q?: string;
 }
 

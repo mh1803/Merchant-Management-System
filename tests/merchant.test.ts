@@ -24,7 +24,12 @@ async function makeMerchantActive(merchantId: string): Promise<void> {
       type,
       fileName: `${type}.pdf`
     });
-    await verifyMerchantDocument(merchantId, type, { verified: true });
+    await verifyMerchantDocument(
+      merchantId,
+      type,
+      { verified: true },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
   }
 }
 
@@ -65,7 +70,7 @@ describe('Merchant service', () => {
     });
   });
 
-  it('filters merchants by status and city', async () => {
+  it('filters merchants by status, city, and pricing tier', async () => {
     const pendingMerchant = await addMerchant({
       name: 'Atlas Pharmacy',
       category: 'Pharmacy',
@@ -106,7 +111,8 @@ describe('Merchant service', () => {
 
     const merchants = await searchMerchants({
       status: 'Active',
-      city: 'Casablanca'
+      city: 'Casablanca',
+      pricingTier: 'standard'
     });
 
     expect(merchants).toHaveLength(1);

@@ -110,7 +110,8 @@ describeHttp('Merchant HTTP API', () => {
         name: 'Casa Electronics',
         category: 'Retail',
         city: 'Casablanca',
-        contactEmail: 'sales@casa.ma'
+        contactEmail: 'sales@casa.ma',
+        pricingTier: 'premium'
       });
 
     await addRequiredKybDocuments(createActiveCandidateResponse.body.id);
@@ -123,7 +124,7 @@ describeHttp('Merchant HTTP API', () => {
 
     const response = await request(app)
       .get('/merchants')
-      .query({ status: 'Active', city: 'Casablanca' })
+      .query({ status: 'Active', city: 'Casablanca', pricingTier: 'premium' })
       .set('Authorization', `Bearer ${adminAccessToken}`);
 
     expect(response.status).toBe(200);

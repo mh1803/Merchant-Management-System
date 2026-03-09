@@ -44,6 +44,7 @@ const listMerchantSchema = z.object({
   status: z.enum(statusValues).optional(),
   city: z.string().trim().optional(),
   category: z.string().trim().optional(),
+  pricingTier: z.enum(pricingTierValues).optional(),
   q: z.string().trim().optional()
 }) satisfies z.ZodType<MerchantFilters>;
 
