@@ -7,6 +7,7 @@ import app from '../src/app';
 import { createOrUpdateOperator, resetAuthStoreForTests } from '../src/db/authRepository';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
 import { resetHistoryStoreForTests } from '../src/db/historyRepository';
+import { resetKybStoreForTests } from '../src/db/kybRepository';
 import { issueAccessToken } from '../src/services/tokenService';
 
 const describeHttp = process.env.RUN_HTTP_TESTS === 'true' ? describe : describe.skip;
@@ -14,10 +15,32 @@ const describeHttp = process.env.RUN_HTTP_TESTS === 'true' ? describe : describe
 describeHttp('Merchant status history HTTP API', () => {
   let accessToken: string;
 
+  async function addRequiredKybDocuments(merchantId: string): Promise<void> {
+    for (const type of [
+      'business_registration',
+      'owner_identity_document',
+      'bank_account_proof'
+    ] as const) {
+      await request(app)
+        .post(`/merchants/${merchantId}/documents`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          type,
+          fileName: `${type}.pdf`
+        });
+
+      await request(app)
+        .patch(`/merchants/${merchantId}/documents/${type}/verify`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ verified: true });
+    }
+  }
+
   beforeEach(async () => {
     resetAuthStoreForTests();
     resetMerchantStoreForTests();
     resetHistoryStoreForTests();
+    resetKybStoreForTests();
 
     const operator = await createOrUpdateOperator({
       email: 'admin@example.com',
@@ -42,6 +65,8 @@ describeHttp('Merchant status history HTTP API', () => {
         city: 'Casablanca',
         contactEmail: 'owner@atlas.ma'
       });
+
+    await addRequiredKybDocuments(createResponse.body.id);
 
     await request(app)
       .patch(`/merchants/${createResponse.body.id}`)

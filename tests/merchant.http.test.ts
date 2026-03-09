@@ -7,35 +7,73 @@ import app from '../src/app';
 import { createOrUpdateOperator, resetAuthStoreForTests } from '../src/db/authRepository';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
 import { resetHistoryStoreForTests } from '../src/db/historyRepository';
+import { resetKybStoreForTests } from '../src/db/kybRepository';
 import { issueAccessToken } from '../src/services/tokenService';
 
 const describeHttp = process.env.RUN_HTTP_TESTS === 'true' ? describe : describe.skip;
 
 describeHttp('Merchant HTTP API', () => {
-  let accessToken: string;
+  let adminAccessToken: string;
+  let operatorAccessToken: string;
+
+  async function addRequiredKybDocuments(merchantId: string): Promise<void> {
+    for (const type of [
+      'business_registration',
+      'owner_identity_document',
+      'bank_account_proof'
+    ] as const) {
+      const createResponse = await request(app)
+        .post(`/merchants/${merchantId}/documents`)
+        .set('Authorization', `Bearer ${adminAccessToken}`)
+        .send({
+          type,
+          fileName: `${type}.pdf`
+        });
+
+      expect(createResponse.status).toBe(201);
+
+      const verifyResponse = await request(app)
+        .patch(`/merchants/${merchantId}/documents/${type}/verify`)
+        .set('Authorization', `Bearer ${adminAccessToken}`)
+        .send({ verified: true });
+
+      expect(verifyResponse.status).toBe(200);
+    }
+  }
 
   beforeEach(async () => {
     resetAuthStoreForTests();
     resetMerchantStoreForTests();
     resetHistoryStoreForTests();
+    resetKybStoreForTests();
 
     const operator = await createOrUpdateOperator({
       email: 'admin@example.com',
       passwordHash: await bcrypt.hash('StrongPass123', 10),
       role: 'admin'
     });
+    const standardOperator = await createOrUpdateOperator({
+      email: 'operator@example.com',
+      passwordHash: await bcrypt.hash('StrongPass123', 10),
+      role: 'operator'
+    });
 
-    accessToken = issueAccessToken({
+    adminAccessToken = issueAccessToken({
       operatorId: operator.id,
       email: operator.email,
       role: operator.role
+    });
+    operatorAccessToken = issueAccessToken({
+      operatorId: standardOperator.id,
+      email: standardOperator.email,
+      role: standardOperator.role
     });
   });
 
   it('creates and retrieves a merchant', async () => {
     const createResponse = await request(app)
       .post('/merchants')
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         name: 'Atlas Pharmacy',
         category: 'Pharmacy',
@@ -48,7 +86,7 @@ describeHttp('Merchant HTTP API', () => {
 
     const getResponse = await request(app)
       .get(`/merchants/${createResponse.body.id}`)
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${adminAccessToken}`);
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body.contactEmail).toBe('owner@atlas.ma');
@@ -57,7 +95,7 @@ describeHttp('Merchant HTTP API', () => {
   it('filters merchants by query params', async () => {
     await request(app)
       .post('/merchants')
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         name: 'Atlas Pharmacy',
         category: 'Pharmacy',
@@ -65,21 +103,28 @@ describeHttp('Merchant HTTP API', () => {
         contactEmail: 'owner@atlas.ma'
       });
 
-    await request(app)
+    const createActiveCandidateResponse = await request(app)
       .post('/merchants')
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         name: 'Casa Electronics',
         category: 'Retail',
         city: 'Casablanca',
-        contactEmail: 'sales@casa.ma',
+        contactEmail: 'sales@casa.ma'
+      });
+
+    await addRequiredKybDocuments(createActiveCandidateResponse.body.id);
+    await request(app)
+      .patch(`/merchants/${createActiveCandidateResponse.body.id}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
         status: 'Active'
       });
 
     const response = await request(app)
       .get('/merchants')
       .query({ status: 'Active', city: 'Casablanca' })
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${adminAccessToken}`);
 
     expect(response.status).toBe(200);
     expect(response.body.items).toHaveLength(1);
@@ -89,7 +134,33 @@ describeHttp('Merchant HTTP API', () => {
   it('updates merchant details', async () => {
     const createResponse = await request(app)
       .post('/merchants')
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma'
+      });
+
+    await addRequiredKybDocuments(createResponse.body.id);
+
+    const updateResponse = await request(app)
+      .patch(`/merchants/${createResponse.body.id}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        city: 'Rabat',
+        status: 'Active'
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.city).toBe('Rabat');
+    expect(updateResponse.body.status).toBe('Active');
+  });
+
+  it('rejects activation without verified KYB documents', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
         name: 'Atlas Pharmacy',
         category: 'Pharmacy',
@@ -99,15 +170,51 @@ describeHttp('Merchant HTTP API', () => {
 
     const updateResponse = await request(app)
       .patch(`/merchants/${createResponse.body.id}`)
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
-        city: 'Rabat',
         status: 'Active'
       });
 
-    expect(updateResponse.status).toBe(200);
-    expect(updateResponse.body.city).toBe('Rabat');
-    expect(updateResponse.body.status).toBe('Active');
+    expect(updateResponse.status).toBe(400);
+    expect(updateResponse.body.code).toBe('KYB_REQUIREMENTS_NOT_MET');
+  });
+
+  it('allows admins to delete merchants', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma'
+      });
+
+    const deleteResponse = await request(app)
+      .delete(`/merchants/${createResponse.body.id}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`);
+
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body).toEqual({ deleted: true });
+  });
+
+  it('rejects merchant deletion by non-admin operators', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma'
+      });
+
+    const deleteResponse = await request(app)
+      .delete(`/merchants/${createResponse.body.id}`)
+      .set('Authorization', `Bearer ${operatorAccessToken}`);
+
+    expect(deleteResponse.status).toBe(403);
+    expect(deleteResponse.body.code).toBe('ADMIN_REQUIRED');
   });
 
   it('rejects unauthenticated requests', async () => {

@@ -161,6 +161,15 @@ export async function setMerchantDocumentVerification(input: {
   return mapDocumentFromDb(rows[0]);
 }
 
+export async function deleteMerchantDocuments(merchantId: string): Promise<void> {
+  if (storageMode() === 'memory') {
+    memoryState.documentsByMerchantId.delete(merchantId);
+    return;
+  }
+
+  await pool.query('DELETE FROM merchant_documents WHERE merchant_id = $1', [merchantId]);
+}
+
 export function resetKybStoreForTests(): void {
   memoryState.documentsByMerchantId.clear();
 }
