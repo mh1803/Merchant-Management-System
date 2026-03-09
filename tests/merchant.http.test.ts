@@ -179,6 +179,22 @@ describeHttp('Merchant HTTP API', () => {
     expect(updateResponse.body.code).toBe('KYB_REQUIREMENTS_NOT_MET');
   });
 
+  it('rejects manual status assignment during merchant creation', async () => {
+    const createResponse = await request(app)
+      .post('/merchants')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        name: 'Atlas Pharmacy',
+        category: 'Pharmacy',
+        city: 'Casablanca',
+        contactEmail: 'owner@atlas.ma',
+        status: 'Active'
+      });
+
+    expect(createResponse.status).toBe(400);
+    expect(createResponse.body.code).toBe('VALIDATION_ERROR');
+  });
+
   it('allows admins to delete merchants', async () => {
     const createResponse = await request(app)
       .post('/merchants')

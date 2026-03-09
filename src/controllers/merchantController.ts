@@ -27,7 +27,7 @@ const createMerchantSchema = z.object({
   city: z.string().trim().min(2),
   contactEmail: z.string().email(),
   pricingTier: z.enum(pricingTierValues).optional()
-}) satisfies z.ZodType<CreateMerchantInput>;
+}).strict() satisfies z.ZodType<CreateMerchantInput>;
 
 const updateMerchantSchema = z.object({
   name: z.string().trim().min(2).optional(),
