@@ -127,6 +127,12 @@ npm run ops -- kyb:verify-doc <merchantId> business_registration true
 ```
 You must be logged in first.
 
+- Register a webhook subscription:
+```bash
+npm run ops -- webhook:subscribe https://example.com/webhook shared-secret
+```
+You must be logged in first.
+
 - Optional: change API base URL when needed:
 ```bash
 API_URL=http://localhost:3000 npm run ops -- health
@@ -154,6 +160,19 @@ API_URL=http://localhost:3000 npm run ops -- health
 - `GET /merchants/:merchantId/history`
   - requires bearer token
   - returns immutable merchant status change history
+
+## Webhook Endpoints
+- `POST /webhooks/subscriptions`
+  - requires bearer token
+  - body: `{ "url": "https://example.com/webhook", "secret": "shared-secret" }`
+  - registers or updates a subscription
+
+Webhook behavior:
+- merchant status changes to `Active` emit `merchant.approved`
+- merchant status changes to `Suspended` emit `merchant.suspended`
+- payloads are signed with `X-Webhook-Signature`
+- failed deliveries retry up to 3 times
+- deliveries run in the background and do not block the original merchant update request
 
 ## Operator Setup
 Use the CLI to create or update operators in the configured auth backend (`AUTH_STORAGE`, default `postgres`):

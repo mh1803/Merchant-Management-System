@@ -7,6 +7,7 @@ import {
   updateMerchant
 } from '../db/merchantRepository';
 import { StatusChangeActor } from '../types/history';
+import { queueMerchantStatusWebhookDispatch } from './webhookService';
 import {
   CreateMerchantInput,
   MerchantFilters,
@@ -56,6 +57,8 @@ export async function editMerchant(
   }
 
   if (statusWillChange && actor) {
+    const changedAt = new Date().toISOString();
+
     await createMerchantStatusHistoryEntry({
       merchantId,
       previousValue: current.status,
@@ -63,6 +66,17 @@ export async function editMerchant(
       changedByOperatorId: actor.operatorId,
       changedByEmail: actor.email
     });
+
+    if (merchant.status === 'Active' || merchant.status === 'Suspended') {
+      queueMerchantStatusWebhookDispatch({
+        eventType: merchant.status === 'Active' ? 'merchant.approved' : 'merchant.suspended',
+        merchantId,
+        merchantName: merchant.name,
+        previousStatus: current.status,
+        newStatus: merchant.status,
+        changedAt
+      });
+    }
   }
 
   return merchant;

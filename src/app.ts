@@ -1,6 +1,7 @@
 import express from 'express';
 import { authRouter } from './routes/authRoutes';
 import { merchantRouter } from './routes/merchantRoutes';
+import { webhookRouter } from './routes/webhookRoutes';
 import { notFound } from './middleware/notFound';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -14,6 +15,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/merchants', merchantRouter);
+app.use('/webhooks', webhookRouter);
 
 app.use(notFound);
 app.use(errorHandler);
