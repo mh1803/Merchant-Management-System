@@ -7,11 +7,17 @@ import {
   upsertMerchantDocument
 } from '../db/kybRepository';
 import {
+  createMerchantDocumentVerificationHistoryEntry,
+  listMerchantDocumentVerificationHistory
+} from '../db/kybHistoryRepository';
+import {
   MerchantDocumentRecord,
+  MerchantDocumentVerificationHistoryRecord,
   MerchantDocumentType,
   RecordMerchantDocumentInput,
   VerifyMerchantDocumentInput
 } from '../types/kyb';
+import { StatusChangeActor } from '../types/history';
 
 async function assertMerchantExists(merchantId: string): Promise<void> {
   const merchant = await getMerchantById(merchantId);
@@ -56,9 +62,15 @@ export async function getMerchantDocumentDetails(
 export async function verifyMerchantDocument(
   merchantId: string,
   type: MerchantDocumentType,
-  input: VerifyMerchantDocumentInput
+  input: VerifyMerchantDocumentInput,
+  actor: StatusChangeActor
 ): Promise<MerchantDocumentRecord> {
   await assertMerchantExists(merchantId);
+  const current = await getMerchantDocument(merchantId, type);
+  if (!current) {
+    throw new AppError(404, 'Merchant document not found', 'MERCHANT_DOCUMENT_NOT_FOUND');
+  }
+
   const document = await setMerchantDocumentVerification({
     merchantId,
     type,
@@ -69,5 +81,24 @@ export async function verifyMerchantDocument(
     throw new AppError(404, 'Merchant document not found', 'MERCHANT_DOCUMENT_NOT_FOUND');
   }
 
+  if (current.verified !== document.verified) {
+    await createMerchantDocumentVerificationHistoryEntry({
+      merchantId,
+      documentType: type,
+      previousVerified: current.verified,
+      newVerified: document.verified,
+      changedByOperatorId: actor.operatorId,
+      changedByEmail: actor.email
+    });
+  }
+
   return document;
+}
+
+export async function getMerchantDocumentVerificationHistory(
+  merchantId: string,
+  type: MerchantDocumentType
+): Promise<MerchantDocumentVerificationHistoryRecord[]> {
+  await assertMerchantExists(merchantId);
+  return listMerchantDocumentVerificationHistory(merchantId, type);
 }

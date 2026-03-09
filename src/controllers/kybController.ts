@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import {
   getMerchantDocumentDetails,
+  getMerchantDocumentVerificationHistory,
   getMerchantDocuments,
   recordMerchantDocument,
   verifyMerchantDocument
@@ -83,6 +84,22 @@ export async function getMerchantDocumentController(
   }
 }
 
+export async function listMerchantDocumentVerificationHistoryController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const items = await getMerchantDocumentVerificationHistory(
+      await merchantIdFromRequest(req),
+      await documentTypeFromRequest(req)
+    );
+    res.status(200).json({ items });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function verifyMerchantDocumentController(
   req: Request,
   res: Response,
@@ -90,10 +107,16 @@ export async function verifyMerchantDocumentController(
 ): Promise<void> {
   try {
     const value = await validateWithSchema(verifyDocumentSchema, req.body);
+    const actor = res.locals.operator as { id: string; email: string; role: 'admin' | 'operator' };
     const document = await verifyMerchantDocument(
       await merchantIdFromRequest(req),
       await documentTypeFromRequest(req),
-      value
+      value,
+      {
+        operatorId: actor.id,
+        email: actor.email,
+        role: actor.role
+      }
     );
     res.status(200).json(document);
   } catch (error) {

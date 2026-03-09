@@ -11,6 +11,7 @@ import {
 } from '../controllers/merchantController';
 import {
   getMerchantDocumentController,
+  listMerchantDocumentVerificationHistoryController,
   listMerchantDocumentsController,
   recordMerchantDocumentController,
   verifyMerchantDocumentController
@@ -31,6 +32,10 @@ merchantRouter.get('/:merchantId/history', listMerchantHistoryController);
 merchantRouter.post('/:merchantId/documents', recordMerchantDocumentController);
 merchantRouter.get('/:merchantId/documents', listMerchantDocumentsController);
 merchantRouter.get('/:merchantId/documents/:documentType', getMerchantDocumentController);
+merchantRouter.get(
+  '/:merchantId/documents/:documentType/history',
+  listMerchantDocumentVerificationHistoryController
+);
 merchantRouter.patch(
   '/:merchantId/documents/:documentType/verify',
   verifyMerchantDocumentController

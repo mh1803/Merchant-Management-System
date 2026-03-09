@@ -21,3 +21,14 @@ export interface RecordMerchantDocumentInput {
 export interface VerifyMerchantDocumentInput {
   verified: boolean;
 }
+
+export interface MerchantDocumentVerificationHistoryRecord {
+  id: string;
+  merchantId: string;
+  documentType: MerchantDocumentType;
+  previousVerified: boolean;
+  newVerified: boolean;
+  changedByOperatorId: string;
+  changedByEmail: string;
+  changedAt: string;
+}

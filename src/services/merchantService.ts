@@ -12,6 +12,7 @@ import {
   updateMerchantPricingTier
 } from '../db/merchantRepository';
 import { deleteMerchantDocuments, listMerchantDocuments } from '../db/kybRepository';
+import { deleteMerchantDocumentVerificationHistory } from '../db/kybHistoryRepository';
 import { StatusChangeActor } from '../types/history';
 import { queueMerchantStatusWebhookDispatch } from './webhookService';
 import {
@@ -218,6 +219,7 @@ export async function removeMerchant(
 
   await Promise.all([
     deleteMerchantDocuments(merchantId),
+    deleteMerchantDocumentVerificationHistory(merchantId),
     deleteMerchantHistoryEntries(merchantId)
   ]);
 
