@@ -88,4 +88,31 @@ describeHttp('Merchant status history HTTP API', () => {
       changedByEmail: 'admin@example.com'
     });
   });
+
+  it('rejects unauthenticated history requests', async () => {
+    const response = await request(app).get(
+      '/merchants/38b8f2ea-632c-4f3c-9b25-6cd2f8141ab7/history'
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('rejects malformed merchant ids', async () => {
+    const response = await request(app)
+      .get('/merchants/not-a-uuid/history')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns not found for unknown merchants', async () => {
+    const response = await request(app)
+      .get('/merchants/38b8f2ea-632c-4f3c-9b25-6cd2f8141ab7/history')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('MERCHANT_NOT_FOUND');
+  });
 });

@@ -28,7 +28,12 @@ async function makeMerchantActive(merchantId: string): Promise<void> {
       type,
       fileName: `${type}.pdf`
     });
-    await verifyMerchantDocument(merchantId, type, { verified: true });
+    await verifyMerchantDocument(
+      merchantId,
+      type,
+      { verified: true },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
   }
 }
 

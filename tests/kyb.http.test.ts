@@ -7,6 +7,7 @@ import app from '../src/app';
 import { createOrUpdateOperator, resetAuthStoreForTests } from '../src/db/authRepository';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
 import { resetKybStoreForTests } from '../src/db/kybRepository';
+import { resetKybHistoryStoreForTests } from '../src/db/kybHistoryRepository';
 import { issueAccessToken } from '../src/services/tokenService';
 
 const describeHttp = process.env.RUN_HTTP_TESTS === 'true' ? describe : describe.skip;
@@ -19,6 +20,7 @@ describeHttp('KYB HTTP API', () => {
     resetAuthStoreForTests();
     resetMerchantStoreForTests();
     resetKybStoreForTests();
+    resetKybHistoryStoreForTests();
 
     const operator = await createOrUpdateOperator({
       email: 'admin@example.com',
@@ -89,6 +91,34 @@ describeHttp('KYB HTTP API', () => {
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body.verified).toBe(true);
+  });
+
+  it('returns verification history with operator details', async () => {
+    await request(app)
+      .post(`/merchants/${merchantId}/documents`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        type: 'owner_identity_document',
+        fileName: 'owner-id.pdf'
+      });
+
+    await request(app)
+      .patch(`/merchants/${merchantId}/documents/owner_identity_document/verify`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ verified: true });
+
+    const historyResponse = await request(app)
+      .get(`/merchants/${merchantId}/documents/owner_identity_document/history`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(historyResponse.status).toBe(200);
+    expect(historyResponse.body.items).toHaveLength(1);
+    expect(historyResponse.body.items[0]).toMatchObject({
+      documentType: 'owner_identity_document',
+      previousVerified: false,
+      newVerified: true,
+      changedByEmail: 'admin@example.com'
+    });
   });
 
   it('validates KYB document payloads', async () => {

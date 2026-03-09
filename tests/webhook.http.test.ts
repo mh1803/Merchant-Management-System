@@ -45,4 +45,28 @@ describeHttp('Webhook HTTP API', () => {
     expect(response.body.url).toBe('https://example.com/webhook');
     expect(response.body.active).toBe(true);
   });
+
+  it('rejects unauthenticated subscription registration', async () => {
+    const response = await request(app).post('/webhooks/subscriptions').send({
+      url: 'https://example.com/webhook',
+      secret: 'supersecret'
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('rejects invalid webhook payloads', async () => {
+    const response = await request(app)
+      .post('/webhooks/subscriptions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        url: 'not-a-url',
+        secret: 'short'
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+    expect(response.body.details).toEqual(expect.any(Array));
+  });
 });

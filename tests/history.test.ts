@@ -21,7 +21,12 @@ async function makeMerchantActive(merchantId: string): Promise<void> {
       type,
       fileName: `${type}.pdf`
     });
-    await verifyMerchantDocument(merchantId, type, { verified: true });
+    await verifyMerchantDocument(
+      merchantId,
+      type,
+      { verified: true },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
   }
 }
 
@@ -101,6 +106,15 @@ describe('Merchant status history service', () => {
       newValue: 'premium',
       changedByOperatorId: 'operator-1',
       changedByEmail: 'admin@example.com'
+    });
+  });
+
+  it('rejects history lookups for missing merchants', async () => {
+    await expect(
+      getMerchantHistory('0b1f6a46-7d57-4d59-8db7-0c7f4bc4bfc1')
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'MERCHANT_NOT_FOUND'
     });
   });
 });
