@@ -2,17 +2,36 @@ process.env.AUTH_STORAGE = 'memory';
 
 import {
   addMerchant,
+  changeMerchantPricingTier,
+  removeMerchant,
   editMerchant,
   getMerchantDetails,
   searchMerchants
 } from '../src/services/merchantService';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
 import { resetHistoryStoreForTests } from '../src/db/historyRepository';
+import { resetKybStoreForTests } from '../src/db/kybRepository';
+import { recordMerchantDocument, verifyMerchantDocument } from '../src/services/kybService';
+
+async function makeMerchantActive(merchantId: string): Promise<void> {
+  for (const type of [
+    'business_registration',
+    'owner_identity_document',
+    'bank_account_proof'
+  ] as const) {
+    await recordMerchantDocument(merchantId, {
+      type,
+      fileName: `${type}.pdf`
+    });
+    await verifyMerchantDocument(merchantId, type, { verified: true });
+  }
+}
 
 describe('Merchant service', () => {
   beforeEach(() => {
     resetMerchantStoreForTests();
     resetHistoryStoreForTests();
+    resetKybStoreForTests();
   });
 
   it('creates a merchant with default status', async () => {
@@ -25,6 +44,7 @@ describe('Merchant service', () => {
 
     expect(merchant.id).toEqual(expect.any(String));
     expect(merchant.status).toBe('Pending KYB');
+    expect(merchant.pricingTier).toBe('standard');
     expect(merchant.contactEmail).toBe('owner@atlas.ma');
   });
 
@@ -45,28 +65,43 @@ describe('Merchant service', () => {
   });
 
   it('filters merchants by status and city', async () => {
-    await addMerchant({
+    const pendingMerchant = await addMerchant({
       name: 'Atlas Pharmacy',
       category: 'Pharmacy',
       city: 'Casablanca',
       contactEmail: 'owner@atlas.ma'
     });
 
-    await addMerchant({
+    const rabatMerchant = await addMerchant({
       name: 'Rabat Diner',
       category: 'Restaurant',
       city: 'Rabat',
-      contactEmail: 'hello@diner.ma',
-      status: 'Active'
+      contactEmail: 'hello@diner.ma'
     });
 
-    await addMerchant({
+    const activeMerchant = await addMerchant({
       name: 'Casa Electronics',
       category: 'Retail',
       city: 'Casablanca',
-      contactEmail: 'sales@casa.ma',
-      status: 'Active'
+      contactEmail: 'sales@casa.ma'
     });
+
+    await editMerchant(
+      pendingMerchant.id,
+      { status: 'Suspended' },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
+    await editMerchant(
+      rabatMerchant.id,
+      { status: 'Suspended' },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
+    await makeMerchantActive(activeMerchant.id);
+    await editMerchant(
+      activeMerchant.id,
+      { status: 'Active' },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
 
     const merchants = await searchMerchants({
       status: 'Active',
@@ -85,15 +120,122 @@ describe('Merchant service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
-    const updated = await editMerchant(created.id, {
-      city: 'Rabat',
-      status: 'Active'
-    }, {
-      operatorId: 'operator-1',
-      email: 'admin@example.com'
-    });
+    await makeMerchantActive(created.id);
+
+    const updated = await editMerchant(
+      created.id,
+      {
+        city: 'Rabat',
+        status: 'Active'
+      },
+      {
+        operatorId: 'operator-1',
+        email: 'admin@example.com',
+        role: 'admin'
+      }
+    );
 
     expect(updated.city).toBe('Rabat');
     expect(updated.status).toBe('Active');
+  });
+
+  it('rejects activation until all required KYB documents are verified', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    await expect(
+      editMerchant(
+        created.id,
+        { status: 'Active' },
+        { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+      )
+    ).rejects.toMatchObject({
+      code: 'KYB_REQUIREMENTS_NOT_MET'
+    });
+  });
+
+  it('rejects invalid status transitions', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    await editMerchant(
+      created.id,
+      { status: 'Suspended' },
+      { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+    );
+
+    await expect(
+      editMerchant(
+        created.id,
+        { status: 'Pending KYB' },
+        { operatorId: 'operator-1', email: 'admin@example.com', role: 'admin' }
+      )
+    ).rejects.toMatchObject({
+      code: 'INVALID_STATUS_TRANSITION'
+    });
+  });
+
+  it('allows admins to change merchant pricing tier', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    const updated = await changeMerchantPricingTier(
+      created.id,
+      { pricingTier: 'premium' },
+      { operatorId: 'admin-1', email: 'admin@example.com', role: 'admin' }
+    );
+
+    expect(updated.pricingTier).toBe('premium');
+  });
+
+  it('allows admins to delete merchants', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    const result = await removeMerchant(created.id, {
+      operatorId: 'admin-1',
+      email: 'admin@example.com',
+      role: 'admin'
+    });
+
+    expect(result).toEqual({ deleted: true });
+    await expect(getMerchantDetails(created.id)).rejects.toMatchObject({
+      code: 'MERCHANT_NOT_FOUND'
+    });
+  });
+
+  it('rejects merchant deletion by non-admin operators', async () => {
+    const created = await addMerchant({
+      name: 'Atlas Pharmacy',
+      category: 'Pharmacy',
+      city: 'Casablanca',
+      contactEmail: 'owner@atlas.ma'
+    });
+
+    await expect(
+      removeMerchant(created.id, {
+        operatorId: 'operator-1',
+        email: 'operator@example.com',
+        role: 'operator'
+      })
+    ).rejects.toMatchObject({
+      code: 'ADMIN_REQUIRED'
+    });
   });
 });

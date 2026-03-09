@@ -8,17 +8,34 @@ import {
 } from '../src/db/webhookRepository';
 import { resetMerchantStoreForTests } from '../src/db/merchantRepository';
 import { resetHistoryStoreForTests } from '../src/db/historyRepository';
+import { resetKybStoreForTests } from '../src/db/kybRepository';
 import {
   registerWebhookSubscription,
   resetWebhookSenderForTests,
   setWebhookSenderForTests,
   waitForWebhookJobsForTests
 } from '../src/services/webhookService';
+import { recordMerchantDocument, verifyMerchantDocument } from '../src/services/kybService';
+
+async function makeMerchantActive(merchantId: string): Promise<void> {
+  for (const type of [
+    'business_registration',
+    'owner_identity_document',
+    'bank_account_proof'
+  ] as const) {
+    await recordMerchantDocument(merchantId, {
+      type,
+      fileName: `${type}.pdf`
+    });
+    await verifyMerchantDocument(merchantId, type, { verified: true });
+  }
+}
 
 describe('Webhook service', () => {
   beforeEach(() => {
     resetMerchantStoreForTests();
     resetHistoryStoreForTests();
+    resetKybStoreForTests();
     resetWebhookStoreForTests();
     resetWebhookSenderForTests();
   });
@@ -59,10 +76,12 @@ describe('Webhook service', () => {
       contactEmail: 'owner@atlas.ma'
     });
 
+    await makeMerchantActive(merchant.id);
+
     await editMerchant(
       merchant.id,
       { status: 'Active' },
-      { operatorId: operator.id, email: operator.email }
+      { operatorId: operator.id, email: operator.email, role: operator.role }
     );
 
     await waitForWebhookJobsForTests();
@@ -105,7 +124,7 @@ describe('Webhook service', () => {
     await editMerchant(
       merchant.id,
       { status: 'Suspended' },
-      { operatorId: operator.id, email: operator.email }
+      { operatorId: operator.id, email: operator.email, role: operator.role }
     );
 
     await waitForWebhookJobsForTests();

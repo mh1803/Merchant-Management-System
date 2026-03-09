@@ -1,11 +1,13 @@
-import { MerchantStatus } from './merchant';
+import { MerchantPricingTier, MerchantStatus } from './merchant';
 
-export interface MerchantStatusHistoryRecord {
+export type MerchantHistoryFieldName = 'status' | 'pricingTier';
+
+export interface MerchantHistoryRecord {
   id: string;
   merchantId: string;
-  fieldName: 'status';
-  previousValue: MerchantStatus;
-  newValue: MerchantStatus;
+  fieldName: MerchantHistoryFieldName;
+  previousValue: MerchantStatus | MerchantPricingTier;
+  newValue: MerchantStatus | MerchantPricingTier;
   changedByOperatorId: string;
   changedByEmail: string;
   changedAt: string;
@@ -14,4 +16,5 @@ export interface MerchantStatusHistoryRecord {
 export interface StatusChangeActor {
   operatorId: string;
   email: string;
+  role: 'admin' | 'operator';
 }

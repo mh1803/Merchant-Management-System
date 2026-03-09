@@ -2,9 +2,11 @@ import express from 'express';
 import { authenticate } from '../middleware/authenticate';
 import {
   createMerchantController,
+  deleteMerchantController,
   getMerchantController,
   listMerchantHistoryController,
   listMerchantsController,
+  updateMerchantPricingTierController,
   updateMerchantController
 } from '../controllers/merchantController';
 import {
@@ -21,6 +23,8 @@ merchantRouter.post('/', createMerchantController);
 merchantRouter.get('/', listMerchantsController);
 merchantRouter.get('/:merchantId', getMerchantController);
 merchantRouter.patch('/:merchantId', updateMerchantController);
+merchantRouter.delete('/:merchantId', deleteMerchantController);
+merchantRouter.patch('/:merchantId/pricing-tier', updateMerchantPricingTierController);
 merchantRouter.get('/:merchantId/history', listMerchantHistoryController);
 merchantRouter.post('/:merchantId/documents', recordMerchantDocumentController);
 merchantRouter.get('/:merchantId/documents', listMerchantDocumentsController);

@@ -1,28 +1,28 @@
 import crypto from 'crypto';
 import { pool } from './index';
-import { MerchantStatusHistoryRecord } from '../types/history';
-import { MerchantStatus } from '../types/merchant';
+import { MerchantHistoryFieldName, MerchantHistoryRecord } from '../types/history';
+import { MerchantPricingTier, MerchantStatus } from '../types/merchant';
 
 interface MerchantStatusHistoryRow {
   id: string;
   merchant_id: string;
-  field_name: 'status';
-  previous_value: MerchantStatus;
-  new_value: MerchantStatus;
+  field_name: MerchantHistoryFieldName;
+  previous_value: MerchantStatus | MerchantPricingTier;
+  new_value: MerchantStatus | MerchantPricingTier;
   changed_by_operator_id: string;
   changed_by_email: string;
   changed_at: string;
 }
 
 const memoryState = {
-  historyByMerchantId: new Map<string, MerchantStatusHistoryRecord[]>()
+  historyByMerchantId: new Map<string, MerchantHistoryRecord[]>()
 };
 
 function storageMode(): string {
   return process.env.AUTH_STORAGE || 'postgres';
 }
 
-function mapHistoryFromDb(row?: MerchantStatusHistoryRow): MerchantStatusHistoryRecord | null {
+function mapHistoryFromDb(row?: MerchantStatusHistoryRow): MerchantHistoryRecord | null {
   if (!row) {
     return null;
   }
@@ -39,17 +39,18 @@ function mapHistoryFromDb(row?: MerchantStatusHistoryRow): MerchantStatusHistory
   };
 }
 
-export async function createMerchantStatusHistoryEntry(input: {
+export async function createMerchantHistoryEntry(input: {
   merchantId: string;
-  previousValue: MerchantStatus;
-  newValue: MerchantStatus;
+  fieldName: MerchantHistoryFieldName;
+  previousValue: MerchantStatus | MerchantPricingTier;
+  newValue: MerchantStatus | MerchantPricingTier;
   changedByOperatorId: string;
   changedByEmail: string;
-}): Promise<MerchantStatusHistoryRecord> {
-  const entry: MerchantStatusHistoryRecord = {
+}): Promise<MerchantHistoryRecord> {
+  const entry: MerchantHistoryRecord = {
     id: crypto.randomUUID(),
     merchantId: input.merchantId,
-    fieldName: 'status',
+    fieldName: input.fieldName,
     previousValue: input.previousValue,
     newValue: input.newValue,
     changedByOperatorId: input.changedByOperatorId,
@@ -74,7 +75,7 @@ export async function createMerchantStatusHistoryEntry(input: {
        changed_by_operator_id,
        changed_by_email
      )
-     VALUES ($1, $2, 'status', $3, $4, $5, $6)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING
        id,
        merchant_id,
@@ -87,6 +88,7 @@ export async function createMerchantStatusHistoryEntry(input: {
     [
       entry.id,
       input.merchantId,
+      input.fieldName,
       input.previousValue,
       input.newValue,
       input.changedByOperatorId,
@@ -104,9 +106,9 @@ export async function createMerchantStatusHistoryEntry(input: {
 
 export async function listMerchantStatusHistory(
   merchantId: string
-): Promise<MerchantStatusHistoryRecord[]> {
+): Promise<MerchantHistoryRecord[]> {
   if (storageMode() === 'memory') {
-    const items = memoryState.historyByMerchantId.get(merchantId) || [];
+    const items: MerchantHistoryRecord[] = memoryState.historyByMerchantId.get(merchantId) || [];
     return items.map((item) => ({ ...item }));
   }
 
@@ -126,7 +128,16 @@ export async function listMerchantStatusHistory(
     [merchantId]
   );
 
-  return rows.map((row) => mapHistoryFromDb(row) as MerchantStatusHistoryRecord);
+  return rows.map((row) => mapHistoryFromDb(row) as MerchantHistoryRecord);
+}
+
+export async function deleteMerchantHistoryEntries(merchantId: string): Promise<void> {
+  if (storageMode() === 'memory') {
+    memoryState.historyByMerchantId.delete(merchantId);
+    return;
+  }
+
+  await pool.query('DELETE FROM merchant_status_history WHERE merchant_id = $1', [merchantId]);
 }
 
 export function resetHistoryStoreForTests(): void {

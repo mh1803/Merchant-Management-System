@@ -1,4 +1,5 @@
 export type MerchantStatus = 'Pending KYB' | 'Active' | 'Suspended';
+export type MerchantPricingTier = 'standard' | 'premium' | 'enterprise';
 
 export interface MerchantRecord {
   id: string;
@@ -7,6 +8,7 @@ export interface MerchantRecord {
   city: string;
   contactEmail: string;
   status: MerchantStatus;
+  pricingTier: MerchantPricingTier;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,7 +18,7 @@ export interface CreateMerchantInput {
   category: string;
   city: string;
   contactEmail: string;
-  status?: MerchantStatus;
+  pricingTier?: MerchantPricingTier;
 }
 
 export interface UpdateMerchantInput {
@@ -27,9 +29,17 @@ export interface UpdateMerchantInput {
   status?: MerchantStatus;
 }
 
+export interface UpdateMerchantPricingTierInput {
+  pricingTier: MerchantPricingTier;
+}
+
 export interface MerchantFilters {
   status?: MerchantStatus;
   city?: string;
   category?: string;
   q?: string;
+}
+
+export interface DeleteMerchantResult {
+  deleted: boolean;
 }

@@ -3,6 +3,7 @@ import { pool } from './index';
 import {
   CreateMerchantInput,
   MerchantFilters,
+  MerchantPricingTier,
   MerchantRecord,
   MerchantStatus,
   UpdateMerchantInput
@@ -15,6 +16,7 @@ interface MerchantRow {
   city: string;
   contact_email: string;
   status: MerchantStatus;
+  pricing_tier: MerchantPricingTier;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +41,7 @@ function mapMerchantFromDb(row?: MerchantRow): MerchantRecord | null {
     city: row.city,
     contactEmail: row.contact_email,
     status: row.status,
+    pricingTier: row.pricing_tier,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -58,7 +61,8 @@ export async function createMerchant(input: CreateMerchantInput): Promise<Mercha
     category: input.category,
     city: input.city,
     contactEmail: input.contactEmail.toLowerCase(),
-    status: input.status || 'Pending KYB',
+    status: 'Pending KYB',
+    pricingTier: input.pricingTier || 'standard',
     createdAt: now,
     updatedAt: now
   };
@@ -69,10 +73,18 @@ export async function createMerchant(input: CreateMerchantInput): Promise<Mercha
   }
 
   const { rows } = await pool.query<MerchantRow>(
-    `INSERT INTO merchants (id, name, category, city, contact_email, status)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, name, category, city, contact_email, status, created_at, updated_at`,
-    [merchant.id, merchant.name, merchant.category, merchant.city, merchant.contactEmail, merchant.status]
+    `INSERT INTO merchants (id, name, category, city, contact_email, status, pricing_tier)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at`,
+    [
+      merchant.id,
+      merchant.name,
+      merchant.category,
+      merchant.city,
+      merchant.contactEmail,
+      merchant.status,
+      merchant.pricingTier
+    ]
   );
 
   const created = mapMerchantFromDb(rows[0]);
@@ -90,7 +102,7 @@ export async function getMerchantById(merchantId: string): Promise<MerchantRecor
   }
 
   const { rows } = await pool.query<MerchantRow>(
-    `SELECT id, name, category, city, contact_email, status, created_at, updated_at
+    `SELECT id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at
      FROM merchants
      WHERE id = $1
      LIMIT 1`,
@@ -174,7 +186,7 @@ export async function listMerchants(filters: MerchantFilters): Promise<MerchantR
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const { rows } = await pool.query<MerchantRow>(
-    `SELECT id, name, category, city, contact_email, status, created_at, updated_at
+    `SELECT id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at
      FROM merchants
      ${whereSql}
      ORDER BY name ASC`,
@@ -201,6 +213,7 @@ export async function updateMerchant(
       city: input.city ?? current.city,
       contactEmail: input.contactEmail?.toLowerCase() ?? current.contactEmail,
       status: input.status ?? current.status,
+      pricingTier: current.pricingTier,
       updatedAt: new Date().toISOString()
     };
 
@@ -218,7 +231,8 @@ export async function updateMerchant(
     category: input.category ?? current.category,
     city: input.city ?? current.city,
     contactEmail: input.contactEmail?.toLowerCase() ?? current.contactEmail,
-    status: input.status ?? current.status
+    status: input.status ?? current.status,
+    pricingTier: current.pricingTier
   };
 
   const { rows } = await pool.query<MerchantRow>(
@@ -228,10 +242,11 @@ export async function updateMerchant(
          city = $4,
          contact_email = $5,
          status = $6,
+         pricing_tier = $7,
          updated_at = NOW()
      WHERE id = $1
-     RETURNING id, name, category, city, contact_email, status, created_at, updated_at`,
-    [merchantId, next.name, next.category, next.city, next.contactEmail, next.status]
+     RETURNING id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at`,
+    [merchantId, next.name, next.category, next.city, next.contactEmail, next.status, next.pricingTier]
   );
 
   return mapMerchantFromDb(rows[0]);
@@ -239,4 +254,44 @@ export async function updateMerchant(
 
 export function resetMerchantStoreForTests(): void {
   memoryState.merchantsById.clear();
+}
+
+export async function updateMerchantPricingTier(
+  merchantId: string,
+  pricingTier: MerchantPricingTier
+): Promise<MerchantRecord | null> {
+  if (storageMode() === 'memory') {
+    const current = memoryState.merchantsById.get(merchantId);
+    if (!current) {
+      return null;
+    }
+
+    const next: MerchantRecord = {
+      ...current,
+      pricingTier,
+      updatedAt: new Date().toISOString()
+    };
+    memoryState.merchantsById.set(merchantId, next);
+    return { ...next };
+  }
+
+  const { rows } = await pool.query<MerchantRow>(
+    `UPDATE merchants
+     SET pricing_tier = $2,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, name, category, city, contact_email, status, pricing_tier, created_at, updated_at`,
+    [merchantId, pricingTier]
+  );
+
+  return mapMerchantFromDb(rows[0]);
+}
+
+export async function deleteMerchantById(merchantId: string): Promise<boolean> {
+  if (storageMode() === 'memory') {
+    return memoryState.merchantsById.delete(merchantId);
+  }
+
+  const result = await pool.query('DELETE FROM merchants WHERE id = $1', [merchantId]);
+  return (result.rowCount || 0) > 0;
 }
