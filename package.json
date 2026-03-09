@@ -23,6 +23,8 @@
     "ops:merchant:list": "bash scripts/ops.sh merchant:list",
     "ops:merchant:get": "bash scripts/ops.sh merchant:get",
     "ops:merchant:update": "bash scripts/ops.sh merchant:update",
+    "ops:merchant:delete": "bash scripts/ops.sh merchant:delete",
+    "ops:merchant:set-pricing-tier": "bash scripts/ops.sh merchant:set-pricing-tier",
     "ops:merchant:history": "bash scripts/ops.sh merchant:history",
     "ops:kyb:add-doc": "bash scripts/ops.sh kyb:add-doc",
     "ops:kyb:list-docs": "bash scripts/ops.sh kyb:list-docs",

@@ -77,6 +77,7 @@ npm run ops -- auth-header
 npm run ops -- merchant:create "Atlas Pharmacy" Pharmacy Casablanca owner@atlas.ma
 ```
 You must be logged in first.
+New merchants start in `Pending KYB`.
 
 - List merchants with optional filters:
 ```bash
@@ -96,6 +97,19 @@ npm run ops -- merchant:update <merchantId> - - Rabat - Active
 ```
 Use `-` to skip fields you do not want to change.
 You must be logged in first.
+Transition to `Active` requires all three KYB documents to be present and verified.
+
+- Delete a merchant:
+```bash
+npm run ops -- merchant:delete <merchantId>
+```
+You must be logged in as an admin.
+
+- Change merchant pricing tier:
+```bash
+npm run ops -- merchant:set-pricing-tier <merchantId> premium
+```
+You must be logged in as an admin.
 
 - View merchant status history:
 ```bash
@@ -148,7 +162,8 @@ API_URL=http://localhost:3000 npm run ops -- health
 ## Merchant Endpoints
 - `POST /merchants`
   - requires bearer token
-  - body: `{ "name": "...", "category": "...", "city": "...", "contactEmail": "...", "status": "Pending KYB|Active|Suspended" }`
+  - body: `{ "name": "...", "category": "...", "city": "...", "contactEmail": "...", "pricingTier": "standard|premium|enterprise" }`
+  - new merchants always start in `Pending KYB`
 - `GET /merchants`
   - requires bearer token
   - optional query params: `status`, `city`, `category`, `q`
@@ -157,9 +172,18 @@ API_URL=http://localhost:3000 npm run ops -- health
 - `PATCH /merchants/:merchantId`
   - requires bearer token
   - body: any subset of merchant fields to update
+  - valid status transitions only: `Pending KYB -> Active|Suspended`, `Active -> Suspended`, `Suspended -> Active`
+  - transition to `Active` requires verified `business_registration`, `owner_identity_document`, and `bank_account_proof`
+- `DELETE /merchants/:merchantId`
+  - requires bearer token
+  - admin only
+- `PATCH /merchants/:merchantId/pricing-tier`
+  - requires bearer token
+  - admin only
+  - body: `{ "pricingTier": "standard|premium|enterprise" }`
 - `GET /merchants/:merchantId/history`
   - requires bearer token
-  - returns immutable merchant status change history
+  - returns immutable merchant status and pricing-tier change history
 
 ## Webhook Endpoints
 - `POST /webhooks/subscriptions`

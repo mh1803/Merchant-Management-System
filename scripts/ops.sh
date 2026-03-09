@@ -147,7 +147,7 @@ Commands:
   auth-header
       Print the Authorization header using the saved access token.
 
-  merchant:create <name> <category> <city> <contactEmail> [status]
+  merchant:create <name> <category> <city> <contactEmail>
       Create a merchant. You must be logged in.
 
   merchant:list [status] [city] [category] [q]
@@ -159,6 +159,12 @@ Commands:
   merchant:update <merchantId> [name] [category] [city] [contactEmail] [status]
       Update merchant fields. You must be logged in.
       Pass - to skip a field you do not want to change.
+
+  merchant:delete <merchantId>
+      Delete a merchant. You must be logged in as an admin.
+
+  merchant:set-pricing-tier <merchantId> <standard|premium|enterprise>
+      Change merchant pricing tier. You must be logged in as an admin.
 
   merchant:history <merchantId>
       View immutable merchant status history. You must be logged in.
@@ -194,6 +200,8 @@ Examples:
   npm run ops -- merchant:list Active Casablanca
   npm run ops -- merchant:get <merchantId>
   npm run ops -- merchant:update <merchantId> - - Rabat - Active
+  npm run ops -- merchant:delete <merchantId>
+  npm run ops -- merchant:set-pricing-tier <merchantId> premium
   npm run ops -- merchant:history <merchantId>
   npm run ops -- kyb:add-doc <merchantId> business_registration business-reg.pdf
   npm run ops -- kyb:list-docs <merchantId>
@@ -283,17 +291,16 @@ case "$cmd" in
     category="${3:-}"
     city="${4:-}"
     contact_email="${5:-}"
-    status_value="${6:-Pending KYB}"
 
     if [[ -z "$name" || -z "$category" || -z "$city" || -z "$contact_email" ]]; then
-      echo "Usage: npm run ops -- merchant:create <name> <category> <city> <contactEmail> [status]" >&2
+      echo "Usage: npm run ops -- merchant:create <name> <category> <city> <contactEmail>" >&2
       exit 1
     fi
 
     payload="$(node -e '
-      const [name, category, city, contactEmail, status] = process.argv.slice(1);
-      process.stdout.write(JSON.stringify({ name, category, city, contactEmail, status }));
-    ' "$name" "$category" "$city" "$contact_email" "$status_value")"
+      const [name, category, city, contactEmail] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ name, category, city, contactEmail }));
+    ' "$name" "$category" "$city" "$contact_email")"
 
     mapfile -t response < <(request_with_saved_access_token "POST" "merchants" "$payload")
     status="${response[0]}"
@@ -385,6 +392,40 @@ case "$cmd" in
     fi
 
     mapfile -t response < <(request_with_saved_access_token "GET" "merchants/$merchant_id/history")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:delete)
+    merchant_id="${2:-}"
+
+    if [[ -z "$merchant_id" ]]; then
+      echo "Usage: npm run ops -- merchant:delete <merchantId>" >&2
+      exit 1
+    fi
+
+    mapfile -t response < <(request_with_saved_access_token "DELETE" "merchants/$merchant_id")
+    status="${response[0]}"
+    body="$(printf '%s\n' "${response[@]:1}")"
+    print_response "$status" "$body"
+    ;;
+
+  merchant:set-pricing-tier)
+    merchant_id="${2:-}"
+    pricing_tier="${3:-}"
+
+    if [[ -z "$merchant_id" || -z "$pricing_tier" ]]; then
+      echo "Usage: npm run ops -- merchant:set-pricing-tier <merchantId> <standard|premium|enterprise>" >&2
+      exit 1
+    fi
+
+    payload="$(node -e '
+      const [pricingTier] = process.argv.slice(1);
+      process.stdout.write(JSON.stringify({ pricingTier }));
+    ' "$pricing_tier")"
+
+    mapfile -t response < <(request_with_saved_access_token "PATCH" "merchants/$merchant_id/pricing-tier" "$payload")
     status="${response[0]}"
     body="$(printf '%s\n' "${response[@]:1}")"
     print_response "$status" "$body"
