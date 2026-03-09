@@ -1,20 +1,20 @@
-import Joi from 'joi';
 import { NextFunction, Request, Response } from 'express';
 import { login, refresh } from '../services/authService';
 import { LoginInput, RefreshInput } from '../types/auth';
+import { validateWithSchema, z } from '../utils/validation';
 
-const loginSchema = Joi.object<LoginInput>({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).required()
-});
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8)
+}) satisfies z.ZodType<LoginInput>;
 
-const refreshSchema = Joi.object<RefreshInput>({
-  refreshToken: Joi.string().required()
-});
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1)
+}) satisfies z.ZodType<RefreshInput>;
 
 export async function loginController(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const value = await loginSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(loginSchema, req.body);
     const response = await login(value);
     res.status(200).json(response);
   } catch (error) {
@@ -22,9 +22,13 @@ export async function loginController(req: Request, res: Response, next: NextFun
   }
 }
 
-export async function refreshController(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function refreshController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
-    const value = await refreshSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(refreshSchema, req.body);
     const response = await refresh(value);
     res.status(200).json(response);
   } catch (error) {

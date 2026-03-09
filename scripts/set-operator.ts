@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import Joi from 'joi';
 import bcrypt from 'bcryptjs';
 import { createOrUpdateOperator } from '../src/db/authRepository';
 import { pool } from '../src/db';
 import { OperatorRole } from '../src/types/auth';
+import { z } from 'zod';
 
 interface OperatorSetInput {
   email: string;
   password: string;
   role: OperatorRole;
 }
+
+const operatorSetSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(['admin', 'operator'])
+}) satisfies z.ZodType<OperatorSetInput>;
 
 function argValue(flag: string): string | null {
   const index = process.argv.indexOf(flag);
@@ -35,15 +41,9 @@ async function run(): Promise<void> {
     process.exit(1);
   }
 
-  const schema = Joi.object<OperatorSetInput>({
-    email: Joi.string().email().required(),
-    password: Joi.string().min(8).required(),
-    role: Joi.string().valid('admin', 'operator').required()
-  });
-
-  const { error } = schema.validate({ email, password, role }, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((item) => item.message).join('; ');
+  const result = operatorSetSchema.safeParse({ email, password, role });
+  if (!result.success) {
+    const messages = result.error.issues.map((item) => item.message).join('; ');
     console.error(`Validation failed: ${messages}`);
     process.exit(1);
   }

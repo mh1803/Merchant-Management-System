@@ -1,4 +1,3 @@
-import Joi from 'joi';
 import { NextFunction, Request, Response } from 'express';
 import { listMerchantHistoryController } from './historyController';
 import {
@@ -17,44 +16,40 @@ import {
   UpdateMerchantPricingTierInput,
   UpdateMerchantInput
 } from '../types/merchant';
+import { validateWithSchema, z } from '../utils/validation';
 
-const statusValues: MerchantStatus[] = ['Pending KYB', 'Active', 'Suspended'];
-const pricingTierValues: MerchantPricingTier[] = ['standard', 'premium', 'enterprise'];
+const statusValues = ['Pending KYB', 'Active', 'Suspended'] as const satisfies MerchantStatus[];
+const pricingTierValues = ['standard', 'premium', 'enterprise'] as const satisfies MerchantPricingTier[];
 
-const createMerchantSchema = Joi.object<CreateMerchantInput>({
-  name: Joi.string().trim().min(2).required(),
-  category: Joi.string().trim().min(2).required(),
-  city: Joi.string().trim().min(2).required(),
-  contactEmail: Joi.string().email().required(),
-  pricingTier: Joi.string()
-    .valid(...pricingTierValues)
-    .optional()
-});
+const createMerchantSchema = z.object({
+  name: z.string().trim().min(2),
+  category: z.string().trim().min(2),
+  city: z.string().trim().min(2),
+  contactEmail: z.string().email(),
+  pricingTier: z.enum(pricingTierValues).optional()
+}) satisfies z.ZodType<CreateMerchantInput>;
 
-const updateMerchantSchema = Joi.object<UpdateMerchantInput>({
-  name: Joi.string().trim().min(2).optional(),
-  category: Joi.string().trim().min(2).optional(),
-  city: Joi.string().trim().min(2).optional(),
-  contactEmail: Joi.string().email().optional(),
-  status: Joi.string()
-    .valid(...statusValues)
-    .optional()
-}).min(1);
+const updateMerchantSchema = z.object({
+  name: z.string().trim().min(2).optional(),
+  category: z.string().trim().min(2).optional(),
+  city: z.string().trim().min(2).optional(),
+  contactEmail: z.string().email().optional(),
+  status: z.enum(statusValues).optional()
+})
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided'
+  }) satisfies z.ZodType<UpdateMerchantInput>;
 
-const listMerchantSchema = Joi.object<MerchantFilters>({
-  status: Joi.string()
-    .valid(...statusValues)
-    .optional(),
-  city: Joi.string().trim().optional(),
-  category: Joi.string().trim().optional(),
-  q: Joi.string().trim().optional()
-});
+const listMerchantSchema = z.object({
+  status: z.enum(statusValues).optional(),
+  city: z.string().trim().optional(),
+  category: z.string().trim().optional(),
+  q: z.string().trim().optional()
+}) satisfies z.ZodType<MerchantFilters>;
 
-const updatePricingTierSchema = Joi.object<UpdateMerchantPricingTierInput>({
-  pricingTier: Joi.string()
-    .valid(...pricingTierValues)
-    .required()
-});
+const updatePricingTierSchema = z.object({
+  pricingTier: z.enum(pricingTierValues)
+}) satisfies z.ZodType<UpdateMerchantPricingTierInput>;
 
 export async function createMerchantController(
   req: Request,
@@ -62,7 +57,7 @@ export async function createMerchantController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await createMerchantSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(createMerchantSchema, req.body);
     const merchant = await addMerchant(value);
     res.status(201).json(merchant);
   } catch (error) {
@@ -76,7 +71,7 @@ export async function listMerchantsController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await listMerchantSchema.validateAsync(req.query, { abortEarly: false });
+    const value = await validateWithSchema(listMerchantSchema, req.query);
     const merchants = await searchMerchants(value);
     res.status(200).json({ items: merchants });
   } catch (error) {
@@ -106,7 +101,7 @@ export async function updateMerchantController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await updateMerchantSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(updateMerchantSchema, req.body);
     const merchantId = Array.isArray(req.params.merchantId)
       ? req.params.merchantId[0]
       : req.params.merchantId;
@@ -128,7 +123,7 @@ export async function updateMerchantPricingTierController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await updatePricingTierSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(updatePricingTierSchema, req.body);
     const merchantId = Array.isArray(req.params.merchantId)
       ? req.params.merchantId[0]
       : req.params.merchantId;

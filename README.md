@@ -8,7 +8,7 @@ The project is implemented in TypeScript with:
 - Express `4.x`
 - PostgreSQL
 - JWT authentication
-- Joi validation
+- Zod validation
 - Jest and Supertest
 
 ## Implemented Features

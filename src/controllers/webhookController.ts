@@ -1,12 +1,14 @@
-import Joi from 'joi';
 import { NextFunction, Request, Response } from 'express';
 import { registerWebhookSubscription } from '../services/webhookService';
 import { RegisterWebhookSubscriptionInput } from '../types/webhook';
+import { validateWithSchema, z } from '../utils/validation';
 
-const registerWebhookSubscriptionSchema = Joi.object<RegisterWebhookSubscriptionInput>({
-  url: Joi.string().uri({ scheme: ['http', 'https'] }).required(),
-  secret: Joi.string().min(8).required()
-});
+const registerWebhookSubscriptionSchema = z.object({
+  url: z.string().url().refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
+    message: 'Invalid URL'
+  }),
+  secret: z.string().min(8)
+}) satisfies z.ZodType<RegisterWebhookSubscriptionInput>;
 
 export async function registerWebhookSubscriptionController(
   req: Request,
@@ -14,9 +16,7 @@ export async function registerWebhookSubscriptionController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await registerWebhookSubscriptionSchema.validateAsync(req.body, {
-      abortEarly: false
-    });
+    const value = await validateWithSchema(registerWebhookSubscriptionSchema, req.body);
     const subscription = await registerWebhookSubscription(value);
     res.status(201).json(subscription);
   } catch (error) {

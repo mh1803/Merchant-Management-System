@@ -1,4 +1,3 @@
-import Joi from 'joi';
 import { NextFunction, Request, Response } from 'express';
 import {
   getMerchantDocumentDetails,
@@ -11,23 +10,22 @@ import {
   RecordMerchantDocumentInput,
   VerifyMerchantDocumentInput
 } from '../types/kyb';
+import { validateWithSchema, z } from '../utils/validation';
 
-const documentTypes: MerchantDocumentType[] = [
+const documentTypes = [
   'bank_account_proof',
   'business_registration',
   'owner_identity_document'
-];
+] as const satisfies MerchantDocumentType[];
 
-const recordDocumentSchema = Joi.object<RecordMerchantDocumentInput>({
-  type: Joi.string()
-    .valid(...documentTypes)
-    .required(),
-  fileName: Joi.string().trim().min(3).required()
-});
+const recordDocumentSchema = z.object({
+  type: z.enum(documentTypes),
+  fileName: z.string().trim().min(3)
+}) satisfies z.ZodType<RecordMerchantDocumentInput>;
 
-const verifyDocumentSchema = Joi.object<VerifyMerchantDocumentInput>({
-  verified: Joi.boolean().required()
-});
+const verifyDocumentSchema = z.object({
+  verified: z.boolean()
+}) satisfies z.ZodType<VerifyMerchantDocumentInput>;
 
 function merchantIdFromRequest(req: Request): string {
   return Array.isArray(req.params.merchantId) ? req.params.merchantId[0] : req.params.merchantId;
@@ -45,7 +43,7 @@ export async function recordMerchantDocumentController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await recordDocumentSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(recordDocumentSchema, req.body);
     const document = await recordMerchantDocument(merchantIdFromRequest(req), value);
     res.status(201).json(document);
   } catch (error) {
@@ -88,7 +86,7 @@ export async function verifyMerchantDocumentController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const value = await verifyDocumentSchema.validateAsync(req.body, { abortEarly: false });
+    const value = await validateWithSchema(verifyDocumentSchema, req.body);
     const document = await verifyMerchantDocument(
       merchantIdFromRequest(req),
       documentTypeFromRequest(req),
